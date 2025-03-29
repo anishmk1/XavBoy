@@ -1,0 +1,3 @@
+# each instruction is 2 hex digits
+00      # nop
+03      # inc r16   register bc
