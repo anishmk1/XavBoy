@@ -1,3 +1,7 @@
 # each instruction is 2 hex digits
 00      # nop
-03      # inc r16   register bc
+13      # inc r16       register de
+13      # inc r16       register de
+13      # inc r16       register de
+1b      # dec r16       register de
+19      # add hl, r16   register de
