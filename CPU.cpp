@@ -30,20 +30,46 @@ public:
     }
 
 
-    void execute(uint8_t cmd) {
+    // rom_ptr can be used after decode to access following bytes of data
+    void execute(uint8_t *rom_ptr) {
 
         uint16_t *reg_ptr;
+        uint8_t cmd = rom_ptr[PC];
 
+        ///////////////////////
+        //      BLOCK 0     //
+        /////////////////////
         if (cmd == 0) {
             std::cout << "  detected: nop" << std::endl;
+        } else if (match(cmd, "00xx0001")) {
+            // ld r16, imm16
+            printf("    detected: ld r16, imm16\n");
+            // next 2 bytes are the immediate
+            // FIXME: Does PC need to be incremented by 2 as well? Confirm
+            uint16_t imm16 = (rom_ptr[PC+1] << 8) + rom_ptr[PC+2];
+            reg_ptr = get_r16(((cmd >> 4) & 0b11));
+            (*reg_ptr) = imm16;
+            PC += 2;
+        } else if (match(cmd, "00xx0010")) {
+            // ld [r16mem], a
+            printf("    UNIMEPLEMENTED\n");
+
+        } else if (match(cmd, "00xx1010")) {
+            // ld a, [r16mem]	
+            printf("    UNIMEPLEMENTED\n");
+
+        } else if (match(cmd, "00001000")) {
+            // ld [imm16], sp
+            printf("    UNIMEPLEMENTED\n");
+
         } else if (match(cmd, "00xx0011")) {
-            // INC R16
+            // inc r16
             printf("    detected: inc r16\n");
             
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)++;
         } else if (match(cmd, "00xx1011")) {
-            // DEC R16
+            // dec r16
             printf("    detected: dec r16\n");
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)--;

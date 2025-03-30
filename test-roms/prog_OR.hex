@@ -1,5 +1,11 @@
 # each instruction is 2 hex digits
 00      # nop
+11      # ld r16, imm16 register de
+ab      
+cd      
+21      # ld r16, imm16 register de
+12      
+34      
 1b      # dec r16       register de
 
 
