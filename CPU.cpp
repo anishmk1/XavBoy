@@ -2,6 +2,8 @@
 //     char *name;
 //     uint16_t val;
 // }
+// #define USE_R8_INDEX true;
+const bool USE_R8_INDEX = true;
 
 
 class CPU {
@@ -30,30 +32,53 @@ public:
 
     void execute(uint8_t cmd) {
 
+        uint16_t *reg_ptr;
+
         if (cmd == 0) {
             std::cout << "  detected: nop" << std::endl;
         } else if (match(cmd, "00xx0011")) {
             // INC R16
             printf("    detected: inc r16\n");
-            uint16_t *reg_ptr;
             
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)++;
         } else if (match(cmd, "00xx1011")) {
             // DEC R16
             printf("    detected: dec r16\n");
-            uint16_t *reg_ptr;
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)--;
         } else if (match(cmd, "00xx1001")) {
             // add hl, r16
             printf("    detected: add hl, r16\n");
-            uint16_t *reg_ptr;
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             HL += (*reg_ptr);
 
-        } 
-        
+        } else if (match(cmd, "00xxx100")) {
+            // inc r8
+            printf("    detected: inc r8\n");
+            // use r8 index to get the pointer of the full r16 reg
+            // then manipulate the lower/upper byte as needed to emulate 8 bit addition
+            // i.e. overflow/underflow of the upper/lower byte should not affect the other byte
+            // e.g DE = 03_FF should result in 03_00 after inc r8 of the lower byte
+            // FIXME: CONFIRM THIS !!
+            int reg_idx = ((cmd >> 3) & 0b111);
+            reg_ptr = get_r16(reg_idx, USE_R8_INDEX);
+            uint16_t r8_byte_mask = (is_upper_byte(reg_idx)) ? 0xff00 : 0x00ff;
+            uint8_t byte = ((*reg_ptr) & r8_byte_mask);
+            byte++;
+            (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+            (*reg_ptr) |= byte;
+        } else if (match(cmd, "00xxx101")) {
+            // dec r8
+            printf("    detected: dec r8\n");
+            int reg_idx = ((cmd >> 3) & 0b111);
+            reg_ptr = get_r16(reg_idx, USE_R8_INDEX);
+            uint16_t r8_byte_mask = (is_upper_byte(reg_idx)) ? 0xff00 : 0x00ff;
+            uint8_t byte = ((*reg_ptr) & r8_byte_mask);
+            byte--;
+            (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+            (*reg_ptr) |= byte;
+        }
         else {
             std::cout << "  default case" << std::endl;
         }
@@ -78,27 +103,36 @@ private:
         }
         return true;
     }
-    // Return address of the register (should remain static througout program runtime)
-    uint16_t *get_r16(int index) {
-        uint16_t *reg_ptr;
-        switch (index) {
-            case 0:
-                reg_ptr = &BC; 
-                break;
-            case 1:
-                reg_ptr = &DE;
-                break;
-            case 2:
-                reg_ptr = &HL;
-                break;
-            case 3:
-                reg_ptr = &SP;
-                break;
-            default:
-                printf ("   Unexpected index to get_r16: %d\n", index);
+
+    // Return address of the register (full 16-bit) (address should remain static througout program runtime)
+    uint16_t *get_r16(int index, bool index_r8_regs=false) {
+
+        if (index_r8_regs) {
+            if (index == 0 || index == 1) return &BC;
+            if (index == 2 || index == 3) return &DE;
+            if (index == 4 || index == 5) return &HL;
+            if (index == 6) {
+                printf ("[hl] indexed. Currently not supported");
+                exit(1);
+            }
+            if (index == 7) return &AF;
+        } else {
+            if (index == 0) return &BC;
+            if (index == 1) return &DE;
+            if (index == 2) return &HL;
+            if (index == 3) return &SP;
+            printf ("   Unexpected index to get_r16: %d\n", index);
+            exit(1);
         }
-        // std::cout << "  Returning reg_ptr: " << reg_ptr << std::endl;
-        return reg_ptr;
+
+        return &AF;
     }
 
+    bool is_upper_byte(int index) {
+        if (index == 0 || index == 2 || index == 4 || index == 7) return true;
+        if (index == 1 || index == 3 || index == 5) return false;
+
+        printf ("   Unexpected/unsupported index to is_upper_byte: %d\n", index);
+        exit(1); 
+    }
 };

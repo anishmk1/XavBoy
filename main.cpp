@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include <cstdint>
-// #include <cstdlib>
+#include <cstdlib>
 #include <cstdio>
 #include "CPU.cpp"
 
