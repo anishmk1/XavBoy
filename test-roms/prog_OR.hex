@@ -11,6 +11,9 @@ cd
 3c      # inc rA
 3c      # inc rA
 12      # ld [rDEmem], a
+08      # ld [imm16], sp
+ab
+ab
 
 
 

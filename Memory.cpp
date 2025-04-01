@@ -1,3 +1,5 @@
+#include <vector>
+
 const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 
 /*

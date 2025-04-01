@@ -25,7 +25,7 @@ public:
     // FIXME: add a destructor
 
     void print_regs() {
-        printf("    |AF: 0x%x    BC: 0x%x    DE: 0x%x    HL: 0x%x    SP: 0x%x    PC: 0x%x|\n",
+        printf("    |AF: 0x%x    BC: 0x%x    DE: 0x%x    HL: 0x%x    SP: 0x%x    PC: 0x%x|\n\n",
                             AF,         BC,           DE,          HL,          SP,          PC);
     }
 
@@ -40,9 +40,8 @@ public:
         //      BLOCK 0     //
         /////////////////////
         if (cmd == 0) {
-            std::cout << "  detected: nop" << std::endl << std::endl;
-        } else if (match(cmd, "00xx0001")) {
-            // ld r16, imm16
+            std::cout << "  detected: nop" << std::endl;
+        } else if (match(cmd, "00xx0001")) {                // ld r16, imm16
             printf("    detected: ld r16, imm16\n");
             // next 2 bytes are the immediate
             // FIXME: Does PC need to be incremented by 2 as well? Confirm
@@ -50,41 +49,43 @@ public:
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr) = imm16;
             PC += 2;
-        } else if (match(cmd, "00xx0010")) {
-            // ld [r16mem], a
-            printf("    detected: ld [r16mem], a\n");
+        } else if (match(cmd, "00xx0010")) {                // ld [r16mem], a
+            printf("    detected: ld dest[r16mem], a\n");
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             mem->set((*reg_ptr), (AF >> 8));
 
-            printf ("   mem[0x%0x]=0x%0x\n", (*reg_ptr), mem->get((*reg_ptr)));
+            assert (mem->get((*reg_ptr)) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
+        } else if (match(cmd, "00xx1010")) {                // ld a, [r16mem]	
+            printf("    detected: ld a, source[r16mem]\n");
+            // FIXME: Create decode functions. Below only works because firts 2 bits are 00
+            reg_ptr = get_r16(((cmd >> 4) & 0b11));
+            AF &= 0x00ff;       // zero out A and dont touch F
+            AF |= ((mem->get((*reg_ptr))) << 8);
+            
+            if (verbose) printf("    log: loaded (from mem) 0x%0x ---> A (0x%0x)\n", *reg_ptr, (AF >> 8));
+            assert (mem->get((*reg_ptr)) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
+        } else if (match(cmd, "00001000")) {                // ld [imm16], sp
+            printf("    detected ld [imm16], sp\n");
+            // next 2 bytes are the immediate
+            uint16_t imm16 = (rom_ptr[PC+1] << 8) + rom_ptr[PC+2];
+            SP = imm16;
+            PC += 2;
 
-        } else if (match(cmd, "00xx1010")) {
-            // ld a, [r16mem]	
-            printf("    UNIMEPLEMENTED\n");
-
-        } else if (match(cmd, "00001000")) {
-            // ld [imm16], sp
-            printf("    UNIMEPLEMENTED\n");
-
-        } else if (match(cmd, "00xx0011")) {
-            // inc r16
+        } else if (match(cmd, "00xx0011")) {                // inc r16
             printf("    detected: inc r16\n");
             
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)++;
-        } else if (match(cmd, "00xx1011")) {
-            // dec r16
+        } else if (match(cmd, "00xx1011")) {                // dec r16
             printf("    detected: dec r16\n");
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr)--;
-        } else if (match(cmd, "00xx1001")) {
-            // add hl, r16
+        } else if (match(cmd, "00xx1001")) {                // add hl, r16
             printf("    detected: add hl, r16\n");
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             HL += (*reg_ptr);
 
-        } else if (match(cmd, "00xxx100")) {
-            // inc r8
+        } else if (match(cmd, "00xxx100")) {                // inc r8
             printf("    detected: inc r8\n");
             // use r8 index to get the pointer of the full r16 reg
             // then manipulate the lower/upper byte as needed to emulate 8 bit addition
@@ -107,8 +108,7 @@ public:
                 (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
                 (*reg_ptr) |= byte;   
             }
-        } else if (match(cmd, "00xxx101")) {
-            // dec r8
+        } else if (match(cmd, "00xxx101")) {                // dec r8
             printf("    detected: dec r8\n");
             int reg_idx = ((cmd >> 3) & 0b111);
             reg_ptr = get_r16(reg_idx, USE_R8_INDEX);

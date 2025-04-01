@@ -9,6 +9,11 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include <cstring> // For strcmp
+#include <cassert>
+
+bool verbose = false;
+
 #include "Memory.cpp"
 #include "CPU.cpp"
 
@@ -43,7 +48,15 @@ uint8_t *open_rom(const char* file_path, size_t *file_size) {
 }
 
 // emulate the cpu for the gameboy
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc != 1 && argc != 2) {
+        std::cerr << "Error opening the file!" << std::endl;
+        return 1;
+    }
+    if (argc == 2) {
+        verbose = (strcmp(argv[1], "--debug") == 0);
+    }
+
     CPU *cpu = new CPU();
 
     // FIXME: Confirm that this automatically frees memory when program finishes
