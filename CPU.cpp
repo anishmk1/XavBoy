@@ -25,13 +25,13 @@ public:
     // FIXME: add a destructor
 
     void print_regs() {
-        printf("    |AF: 0x%0x    BC: 0x%0x    DE: 0x%0x    HL: 0x%0x    SP: 0x%0x    PC: 0x%0x|\n",
+        printf("    |AF: 0x%x    BC: 0x%x    DE: 0x%x    HL: 0x%x    SP: 0x%x    PC: 0x%x|\n",
                             AF,         BC,           DE,          HL,          SP,          PC);
     }
 
 
     // rom_ptr can be used after decode to access following bytes of data
-    void execute(uint8_t *rom_ptr) {
+    void execute(uint8_t *rom_ptr, Memory *mem) {
 
         uint16_t *reg_ptr;
         uint8_t cmd = rom_ptr[PC];
@@ -40,7 +40,7 @@ public:
         //      BLOCK 0     //
         /////////////////////
         if (cmd == 0) {
-            std::cout << "  detected: nop" << std::endl;
+            std::cout << "  detected: nop" << std::endl << std::endl;
         } else if (match(cmd, "00xx0001")) {
             // ld r16, imm16
             printf("    detected: ld r16, imm16\n");
@@ -52,7 +52,11 @@ public:
             PC += 2;
         } else if (match(cmd, "00xx0010")) {
             // ld [r16mem], a
-            printf("    UNIMEPLEMENTED\n");
+            printf("    detected: ld [r16mem], a\n");
+            reg_ptr = get_r16(((cmd >> 4) & 0b11));
+            mem->set((*reg_ptr), (AF >> 8));
+
+            printf ("   mem[0x%0x]=0x%0x\n", (*reg_ptr), mem->get((*reg_ptr)));
 
         } else if (match(cmd, "00xx1010")) {
             // ld a, [r16mem]	
@@ -89,21 +93,39 @@ public:
             // FIXME: CONFIRM THIS !!
             int reg_idx = ((cmd >> 3) & 0b111);
             reg_ptr = get_r16(reg_idx, USE_R8_INDEX);
-            uint16_t r8_byte_mask = (is_upper_byte(reg_idx)) ? 0xff00 : 0x00ff;
-            uint8_t byte = ((*reg_ptr) & r8_byte_mask);
-            byte++;
-            (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-            (*reg_ptr) |= byte;
+
+            if (is_upper_byte(reg_idx)) {
+                uint16_t r8_byte_mask = 0xff00;
+                uint8_t byte = ((*reg_ptr) & r8_byte_mask) >> 8;
+                byte++;
+                (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+                (*reg_ptr) |= (byte << 8);
+            } else {
+                uint16_t r8_byte_mask = 0x00ff;
+                uint8_t byte = ((*reg_ptr) & r8_byte_mask);
+                byte++;
+                (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+                (*reg_ptr) |= byte;   
+            }
         } else if (match(cmd, "00xxx101")) {
             // dec r8
             printf("    detected: dec r8\n");
             int reg_idx = ((cmd >> 3) & 0b111);
             reg_ptr = get_r16(reg_idx, USE_R8_INDEX);
-            uint16_t r8_byte_mask = (is_upper_byte(reg_idx)) ? 0xff00 : 0x00ff;
-            uint8_t byte = ((*reg_ptr) & r8_byte_mask);
-            byte--;
-            (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-            (*reg_ptr) |= byte;
+
+            if (is_upper_byte(reg_idx)) {
+                uint16_t r8_byte_mask = 0xff00;
+                uint8_t byte = ((*reg_ptr) & r8_byte_mask) >> 8;
+                byte--;
+                (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+                (*reg_ptr) |= (byte << 8);
+            } else {
+                uint16_t r8_byte_mask = 0x00ff;
+                uint8_t byte = ((*reg_ptr) & r8_byte_mask);
+                byte--;
+                (*reg_ptr) &= (~r8_byte_mask);      // clear out the addressed byte of the r16
+                (*reg_ptr) |= byte;   
+            }
         }
         else {
             std::cout << "  default case" << std::endl;

@@ -7,6 +7,10 @@ cd
 12      
 34      
 1b      # dec r16       register de
+3c      # inc rA
+3c      # inc rA
+3c      # inc rA
+12      # ld [rDEmem], a
 
 
 
@@ -19,6 +23,8 @@ cd
 #1b      # dec r16       register de
 #1c      # inc r8        register e
 #1d      # dec r8        register e
+#3c      # inc rA
+#12      # ld [rDEmem], a
 #   
 #
 #

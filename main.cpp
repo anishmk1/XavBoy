@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstdio>
+#include "Memory.cpp"
 #include "CPU.cpp"
 
 uint8_t *open_rom(const char* file_path, size_t *file_size) {
@@ -45,6 +46,10 @@ uint8_t *open_rom(const char* file_path, size_t *file_size) {
 int main() {
     CPU *cpu = new CPU();
 
+    // FIXME: Confirm that this automatically frees memory when program finishes
+    // use valgrind etc
+    Memory *mem = new Memory();
+
     size_t file_size;
     uint8_t *rom_ptr;
     rom_ptr = open_rom("test-roms/prog_OR.gb", &file_size);
@@ -61,7 +66,7 @@ int main() {
         uint8_t cmd = rom_ptr[cpu->PC];
         printf ("PC=%d: cmd=0x%0x\n", cpu->PC, static_cast<int>(cmd));
 
-        cpu->execute(rom_ptr);
+        cpu->execute(rom_ptr, mem);
         // increment PC
         cpu->PC++;
     }
