@@ -10,6 +10,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 */
 class Memory {
 
+    size_t romSize;
     std::vector<uint8_t> mem;
     // std::vector<uint8_t> mem = std::vector<uint8_t>(MEMORY_SIZE, 0);
 
@@ -41,4 +42,19 @@ public:
 
         return mem[addr];
     }
+
+    void load_rom(uint8_t *rom_ptr, size_t file_size) {
+        printf ("Loading ROM into Memory Address 0x0000....\n");
+        printf ("   file_size: %lu\n", file_size);
+        for (size_t i = 0; i < file_size; i++) {
+            set(i, rom_ptr[i]); 
+        }
+        romSize = file_size;
+        printf ("Successfully loaded ROM!\n\n");
+
+    }
+
+    // void dump_ROM() {
+    //     printf("")
+    // }
 };

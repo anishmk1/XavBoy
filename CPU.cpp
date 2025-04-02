@@ -9,7 +9,7 @@ const bool USE_R8_INDEX = true;
 class CPU {
 public:
 
-    // FIXME: move these into a separate register file struct?
+    // FIXME: MAKE THIS AN ARRAY OF REGS. EACH ONE IS A STRUCT/CLASS WITH A NAME AND A VALUE
     uint16_t AF;
     uint16_t BC;
     uint16_t DE;
@@ -25,16 +25,15 @@ public:
     // FIXME: add a destructor
 
     void print_regs() {
-        printf("    |AF: 0x%x    BC: 0x%x    DE: 0x%x    HL: 0x%x    SP: 0x%x    PC: 0x%x|\n\n",
+        printf("    |AF: 0x%0x    BC: 0x%0x    DE: 0x%0x    HL: 0x%0x    SP: 0x%0x    PC: 0x%0x|\n\n",
                             AF,         BC,           DE,          HL,          SP,          PC);
     }
 
 
-    // rom_ptr can be used after decode to access following bytes of data
-    void execute(uint8_t *rom_ptr, Memory *mem) {
+    void execute(Memory *mem) {
 
         uint16_t *reg_ptr;
-        uint8_t cmd = rom_ptr[PC];
+        uint8_t cmd = mem->get(PC);
 
         ///////////////////////
         //      BLOCK 0     //
@@ -45,7 +44,7 @@ public:
             printf("    detected: ld r16, imm16\n");
             // next 2 bytes are the immediate
             // FIXME: Does PC need to be incremented by 2 as well? Confirm
-            uint16_t imm16 = (rom_ptr[PC+1] << 8) + rom_ptr[PC+2];
+            uint16_t imm16 = (mem->get(PC+1) << 8) + mem->get(PC+2);
             reg_ptr = get_r16(((cmd >> 4) & 0b11));
             (*reg_ptr) = imm16;
             PC += 2;
@@ -67,7 +66,7 @@ public:
         } else if (match(cmd, "00001000")) {                // ld [imm16], sp
             printf("    detected ld [imm16], sp\n");
             // next 2 bytes are the immediate
-            uint16_t imm16 = (rom_ptr[PC+1] << 8) + rom_ptr[PC+2];
+            uint16_t imm16 = (mem->get(PC+1) << 8) + mem->get(PC+2);
             SP = imm16;
             PC += 2;
 

@@ -70,21 +70,21 @@ int main(int argc, char* argv[]) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
     }
-
-    printf ("file_size: %lu\n", file_size);
-    // main loop
-    // for (int i = 0; i < file_size; i++) {
-    while (cpu->PC < file_size) {
-        // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
-        uint8_t cmd = rom_ptr[cpu->PC];
-        printf ("PC=%d: cmd=0x%0x\n", cpu->PC, static_cast<int>(cmd));
-
-        cpu->execute(rom_ptr, mem);
-        // increment PC
-        cpu->PC++;
-    }
+    mem->load_rom(rom_ptr, file_size);
 
     if (munmap(rom_ptr, file_size) == -1) {
         perror("Error unmapping file");
     }
+
+    // main loop
+    while (cpu->PC < file_size) {
+        // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
+        printf ("PC=%d: cmd=0x%0x\n", cpu->PC, static_cast<int>(mem->get(cpu->PC)));
+
+        cpu->execute(mem);
+        // increment PC
+        cpu->PC++;
+    }
+
+    
 }
