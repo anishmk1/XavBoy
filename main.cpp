@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <array>
 
 #include <cstdint>
 #include <cstdlib>
@@ -77,13 +78,13 @@ int main(int argc, char* argv[]) {
     }
 
     // main loop
-    while (cpu->PC < file_size) {
+    while (cpu->regs[PC].val < file_size) {
         // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
-        printf ("PC=%d: cmd=0x%0x\n", cpu->PC, static_cast<int>(mem->get(cpu->PC)));
+        printf ("PC=%d: cmd=0x%0x\n", cpu->regs[PC].val, static_cast<int>(mem->get(cpu->regs[PC].val)));
 
         cpu->execute(mem);
         // increment PC
-        cpu->PC++;
+        cpu->regs[PC].val++;
     }
 
     
