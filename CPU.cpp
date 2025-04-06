@@ -3,22 +3,26 @@ const int NUM_REGS = 6;
 
 enum reg_index_t {AF,BC,DE,HL,SP,PC};
 
-typedef struct Reg {
-    reg_index_t name;
-    union {    
-        struct {
-            uint8_t lo;
-            uint8_t hi;
-        };
-        uint16_t val;
+union Reg {
+    struct {
+        uint8_t lo;
+        uint8_t hi;
     };
+    uint16_t val;
+    struct {
+        uint8_t rsvd : 4;
+        uint8_t c    : 1;
+        uint8_t h    : 1;
+        uint8_t n    : 1;
+        uint8_t z    : 1;
+    } flags;
 };
 
 
 class CPU {
 public:
 
-    Reg regs[NUM_REGS] =  {{AF, .val=0},  {BC, .val=0},  {DE, .val=0},  {HL, .val=0},   {SP, .val=0},  {PC, .val=0}};
+    Reg regs[NUM_REGS] =  {0,0,0,0,0,0};
 
     // Default constructor
     CPU () {}
@@ -26,8 +30,8 @@ public:
     // add a destructor
 
     void print_regs() {
-        printf("    |AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x|\n\n",
-                    regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val);
+        printf("    | AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x ||   znhc: %d%d%d%d\n\n",
+                    regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c);
     }
 
 
@@ -52,15 +56,14 @@ public:
         } else if (match(cmd, "00xx0010")) {                // ld [r16mem], a
             printf("    detected: ld dest[r16mem], a\n");
             int reg_idx = get_r16(((cmd >> 4) & 0b11));
-            mem->set(regs[reg_idx].val, (regs[AF].val >> 8));
+            mem->set(regs[reg_idx].val, (regs[AF].hi));
 
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00xx1010")) {                // ld a, [r16mem]	
             printf("    detected: ld a, source[r16mem]\n");
             // FIXME: Create decode functions. Below only works because firts 2 bits are 00
             int reg_idx = get_r16(((cmd >> 4) & 0b11));
-            regs[AF].val &= 0x00ff;       // zero out A and dont touch F
-            regs[AF].val |= ((mem->get(regs[reg_idx].val)) << 8);
+            regs[AF].hi = ((mem->get(regs[reg_idx].val)) << 8);
             
             if (verbose) printf("    log: loaded (from mem) 0x%0x ---> A (0x%0x)\n", regs[reg_idx].val, (regs[AF].val >> 8));
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
@@ -86,44 +89,49 @@ public:
             regs[HL].val += regs[reg_idx].val;
 
         } else if (match(cmd, "00xxx100")) {                // inc r8
-            printf("    detected: inc r8\n");
+            printf("    detected: inc r8 ---");
             // use r8 index to get the pointer of the full r16 reg
             // then manipulate the lower/upper byte as needed to emulate 8 bit addition
             // i.e. overflow/underflow of the upper/lower byte should not affect the other byte
             // e.g DE = 03_FF should result in 03_00 after inc r8 of the lower byte
             // FIXME: CONFIRM THIS !!
-            int reg_idx = get_r16(((cmd >> 3) & 0b111), USE_R8_INDEX);
+            int reg_bits = ((cmd >> 3) & 0b111);
+            reg_index_t reg_idx = get_r16(reg_bits, USE_R8_INDEX);
 
-            if (is_upper_byte(((cmd >> 3) & 0b111))) {
-                uint16_t r8_byte_mask = 0xff00;
-                uint8_t byte = (regs[reg_idx].val & r8_byte_mask) >> 8;
-                byte++;
-                regs[reg_idx].val &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-                regs[reg_idx].val |= (byte << 8);
+            if (is_upper_byte(reg_bits)) {
+                regs[reg_idx].hi++;
             } else {
-                uint16_t r8_byte_mask = 0x00ff;
-                uint8_t byte = (regs[reg_idx].val & r8_byte_mask);
-                byte++;
-                regs[reg_idx].val &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-                regs[reg_idx].val |= byte;   
+                regs[reg_idx].lo++;
             }
+            printf(" incrementing reg %s\n", get_reg_name(reg_bits, USE_R8_INDEX).c_str());
         } else if (match(cmd, "00xxx101")) {                // dec r8
             printf("    detected: dec r8\n");
             int reg_idx = get_r16(((cmd >> 3) & 0b111), USE_R8_INDEX);
 
-            if (is_upper_byte((cmd >> 3) & 0b111)) {
-                uint16_t r8_byte_mask = 0xff00;
-                uint8_t byte = (regs[reg_idx].val & r8_byte_mask) >> 8;
-                byte--;
-                regs[reg_idx].val &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-                regs[reg_idx].val |= (byte << 8);
+            if (is_upper_byte(((cmd >> 3) & 0b111))) {
+                regs[reg_idx].hi--;
             } else {
-                uint16_t r8_byte_mask = 0x00ff;
-                uint8_t byte = (regs[reg_idx].val & r8_byte_mask);
-                byte--;
-                regs[reg_idx].val &= (~r8_byte_mask);      // clear out the addressed byte of the r16
-                regs[reg_idx].val |= byte;   
+                regs[reg_idx].lo--;
             }
+        } else if (match(cmd, "00xxx110")) {                // ld r8, imm8
+            printf("    detected: dec r8 ---");
+            uint8_t imm8 = mem->get(regs[PC].val + 1);
+            int reg_bits = ((cmd >> 3) & 0b111);
+            reg_index_t reg = get_r16(reg_bits, USE_R8_INDEX);
+            if (is_upper_byte(reg_bits)) {
+                regs[reg].hi = imm8;
+            } else {
+                regs[reg].lo = imm8;
+            }
+
+            regs[PC].val++;
+        } else if (match(cmd, "00000111")) {                // rlca
+            printf("    detected: rlca --- ");
+            int msb = regs[AF].hi >> 7;
+            regs[AF].hi = regs[AF].hi << 1;
+            regs[AF].hi |= msb;     // rotate msb into lsb
+            regs[AF].flags.c = msb;       // Update Carry Flag
+            printf("rotated A. carry=msb=%d\n", msb);
         }
         else {
             std::cout << "  default case" << std::endl;
@@ -150,7 +158,7 @@ private:
         return true;
     }
 
-    int get_r16(int index, bool index_r8_regs=false) {
+    reg_index_t get_r16(int index, bool index_r8_regs=false) {
 
         if (index_r8_regs) {
             if (index == 0 || index == 1) return BC;
@@ -179,5 +187,27 @@ private:
 
         printf ("   Unexpected/unsupported index to is_upper_byte: %d\n", index);
         exit(1); 
+    }
+
+    std::string get_reg_name(int reg_bits, bool index_r8_regs=false) {
+        if (index_r8_regs) {
+            if (reg_bits == 0) return "B";
+            if (reg_bits == 1) return "C";
+            if (reg_bits == 2) return "D";
+            if (reg_bits == 3) return "E";
+            if (reg_bits == 4) return "H";
+            if (reg_bits == 5) return "L";
+            if (reg_bits == 6) return "[hl]";
+            if (reg_bits == 7) return "A";
+            printf ("   Unexpected reg_bits to get_reg_name: %d\n", reg_bits);
+            exit(1);
+        } else {
+            if (reg_bits == 0) return "BC";
+            if (reg_bits == 1) return "DE";
+            if (reg_bits == 2) return "HL";
+            if (reg_bits == 3) return "SP";
+            printf ("   Unexpected reg_bits to get_reg_name: %d\n", reg_bits);
+            exit(1);
+        }
     }
 };

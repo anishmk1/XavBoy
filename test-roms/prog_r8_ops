@@ -1,0 +1,6 @@
+00	    # nop
+11      # ld r16, imm16 register de
+ab      
+ff
+1c      # inc r8        register e
+1d      # dec r8        register e

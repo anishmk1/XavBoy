@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <array>
+#include <string>
 
 #include <cstdint>
 #include <cstdlib>
