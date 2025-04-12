@@ -16,6 +16,7 @@
 
 std::ofstream logFile;
 bool verbose = false;
+bool disable_prints = false;
 const bool LOAD_BOOT_ROM = false;
 
 #include "Memory.cpp"
@@ -74,6 +75,7 @@ int main(int argc, char* argv[]) {
     setup_serial_output();
 
     CPU *cpu = new CPU();
+    Reg (&regs)[NUM_REGS] = cpu->rf.regs;
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
@@ -96,10 +98,10 @@ int main(int argc, char* argv[]) {
     size_t num_bytes = 0;
     while (num_bytes++ < file_size) {
         // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
-        printf ("PC=0x%0x: cmd=0x%0x\n", cpu->regs[PC].val, static_cast<int>(mem->get(cpu->regs[PC].val)));
+        printf ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
 
         cpu->execute(mem);
         // increment PC
-        cpu->regs[PC].val++;
+        regs[PC].val++;
     }
 }
