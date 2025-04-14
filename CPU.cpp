@@ -17,7 +17,7 @@ const int NUM_REGS = 6;
 // FIXME: Use maps to map index to r8/r16 regs. A lot of functions could use this
 
 enum reg_index_t {AF,BC,DE,HL,SP,PC};
-enum r8_index_t {A, B, C, D, E, H, L, F};
+enum r8_index_t {A, B, C, D, E, H, L, hl, F};
 
 union Reg {
     struct {
@@ -37,6 +37,7 @@ union Reg {
 class RegFile {
 public:
     Reg regs[NUM_REGS];
+    Memory *mem;        // for [hl]
 
     uint16_t get(reg_index_t r16) {
         return regs[r16].val;
@@ -50,6 +51,7 @@ public:
         if (r8 == F) return regs[AF].lo;
         if (r8 == H) return regs[HL].hi;
         if (r8 == L) return regs[HL].lo;
+        if (r8 == hl) return mem->get(regs[HL].val);
         print (" Unexpected index to get(r8_index_t) \n");
         exit(1);
     }
@@ -63,6 +65,7 @@ public:
         if (r8 == F) regs[AF].lo = val;
         if (r8 == H) regs[HL].hi = val;
         if (r8 == L) regs[HL].lo = val;
+        if (r8 == hl) mem->set(regs[HL].val, val);
     }
 
     void set(reg_index_t r16, uint16_t val) {
@@ -76,38 +79,21 @@ public:
         if (index == 3) return E;
         if (index == 4) return H;
         if (index == 5) return L;
-        if (index == 6) {
-            print (" reg_r8 with index 6 sohuld return [hl]. Idk what this means yet tho :(\n");
-            return H;
-            // exit(1);
-        }
+        if (index == 6) return hl;
         if (index == 7) return A;
 
-        print (" reg_r8 with index 6 sohuld return [hl]. Idk what this means yet tho :(\n");
+        print (" Unexpected index to get_r8: %0d\n", index);
         exit(1);
     }
 
-    static reg_index_t get_r16(int index, bool index_r8_regs=false) {
+    static reg_index_t get_r16(int index) {
 
-        if (index_r8_regs) {
-            if (index == 0 || index == 1) return BC;
-            if (index == 2 || index == 3) return DE;
-            if (index == 4 || index == 5) return HL;
-            if (index == 6) {
-                print ("[hl] indexed. Currently not supported");
-                exit(1);
-            }
-            if (index == 7) return AF;
-        } else {
-            if (index == 0) return BC;
-            if (index == 1) return DE;
-            if (index == 2) return HL;
-            if (index == 3) return SP;
-            print ("   Unexpected index to get_r16: %d\n", index);
-            exit(1);
-        }
-
-        return AF;
+        if (index == 0) return BC;
+        if (index == 1) return DE;
+        if (index == 2) return HL;
+        if (index == 3) return SP;
+        print ("   Unexpected index to get_r16: %d\n", index);
+        exit(1);
     }
 
     static const char* get_reg_name(r8_index_t r8) {
@@ -119,6 +105,7 @@ public:
         if (r8 == F) return "F";
         if (r8 == H) return "H";
         if (r8 == L) return "L";
+        if (r8 == hl) return "hl";
 
         print (" get_reg_name Unexpected r8_index_t\n");
         exit(1);
@@ -136,6 +123,11 @@ public:
         print (" get_reg_name Unexpected r16_index_t\n");
         exit(1);
     }
+
+    void print_regs() {
+        print("    | AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x ||   znhc: %d%d%d%d ||   *[hl]: 0x%0x\n\n",
+                    regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c, mem->get(get(HL)));
+    }
 };
 
 
@@ -145,20 +137,16 @@ public:
     RegFile rf;
 
     // Default constructor
-    CPU () {
+    CPU (Memory *mem) {
         if (LOAD_BOOT_ROM) {
             rf.regs[PC].val = 0;
         } else {
             rf.regs[PC].val = 0x100;
         }
+        rf.mem = mem;
     }
 
     // add a destructor
-
-    void print_regs() {
-        print("    | AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x ||   znhc: %d%d%d%d\n\n",
-                    rf.regs[AF].val, rf.regs[BC].val, rf.regs[DE].val, rf.regs[HL].val, rf.regs[SP].val, rf.regs[PC].val, rf.regs[AF].flags.z,  rf.regs[AF].flags.n,  rf.regs[AF].flags.h,  rf.regs[AF].flags.c);
-    }
 
 
     void execute(Memory *mem) {
@@ -325,20 +313,67 @@ public:
         } else if (match(cmd, "00010000")) {                // stop
             print("    detected: stop\n");
             rf.regs[PC].val++;         // stop is NOP but 2 cycles (FIXME: need to pair this with WAKE?)
-        } else if (match(cmd, "01xxxxxx")) {
-            print("    detected: ld r8, r8 ----");
-            int regd_bits = ((cmd >> 3) & 0b111);
-            int regs_bits = (cmd & 0b111);
-            r8_index_t reg_d = RegFile::get_r8(regd_bits); //RegFile::get_r16(regd_bits, USE_R8_INDEX);
-            r8_index_t reg_s = RegFile::get_r8(regs_bits); //RegFile::get_r16(regs_bits, USE_R8_INDEX);
-            rf.set(reg_d, rf.get(reg_s));
-            print(" r[%s] <= r[%s](0x%0x)\n", RegFile::get_reg_name(reg_s), RegFile::get_reg_name(reg_d), rf.get(reg_d));
+        } 
+
+        ///////////////////////
+        //      BLOCK 1     //
+        /////////////////////
+        else if (match(cmd, "01xxxxxx")) {                  // ld r8, r8
+            if (match(cmd, "01110110")) {
+                print("    detected: halt ---- FIXME UNIMPLEMENTED");
+            } else {
+                print("    detected: ld r8, r8 ----");
+                int regd_bits = ((cmd >> 3) & 0b111);
+                int regs_bits = (cmd & 0b111);
+                r8_index_t reg_d = RegFile::get_r8(regd_bits); //RegFile::get_r16(regd_bits, USE_R8_INDEX);
+                r8_index_t reg_s = RegFile::get_r8(regs_bits); //RegFile::get_r16(regs_bits, USE_R8_INDEX);
+                rf.set(reg_d, rf.get(reg_s));
+                print(" r[%s] <= r[%s](0x%0x)\n", RegFile::get_reg_name(reg_d), RegFile::get_reg_name(reg_s), rf.get(reg_d));
+            }
         }
+        
+        ///////////////////////
+        //      BLOCK 2     //
+        /////////////////////
+        else if (match(cmd, "10000xxx")) {                  // add a, r8
+            print ("    detected: add a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            compute_flags_add8(rf.get(A), rf.get(r8));
+            rf.regs[AF].hi += rf.get(r8);
+            print (" A += r[%s](0x%0x)\n", RegFile::get_reg_name(r8), rf.get(r8));
+        } else if (match(cmd, "10001xxx")) {                // adc a, r8
+            print ("    detected: adc a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            print (" A += carry(%0d) + r[%s](0x%0x)\n", rf.regs[AF].flags.c, RegFile::get_reg_name(r8), rf.get(r8));
+            compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, rf.get(r8));
+            rf.regs[AF].hi += (rf.regs[AF].flags.c + rf.get(r8));
+        } else if (match(cmd, "10010xxx")) {                // sub a, r8
+            print ("    detected: sub a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            compute_flags_sub8(rf.get(A), rf.get(r8));
+            rf.regs[AF].hi -= rf.get(r8);
+            print (" A -= r[%s](0x%0x)\n", RegFile::get_reg_name(r8), rf.get(r8));
+        } else if (match(cmd, "10011xxx")) {                // sbc a, r8
+            print ("   detected: sbc a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            print (" A -= (r[%s]:0x%0x + carry(%0d))\n", RegFile::get_reg_name(r8), rf.get(r8), rf.regs[AF].flags.c);
+            compute_flags_sub8(rf.get(A), (rf.get(r8) + rf.regs[AF].flags.c));
+            rf.regs[AF].hi -= (rf.get(r8) + rf.regs[AF].flags.c);
+        }
+
         else {
             print ("    default case\n");
         }
 
-        print_regs();
+        rf.print_regs();
         serial_output(mem);
     }
 
@@ -355,6 +390,20 @@ private:
             if (cmd_bit != compare_bit) return false;
         }
         return true;
+    }
+
+    void compute_flags_add8(int a, int b) {
+        rf.regs[AF].flags.h = (((a & 0x0F) + (b & 0x0F)) > 0x0F);   // carry at bit 3?
+        rf.regs[AF].flags.c = (((a & 0xFF) + (b & 0xFF)) > 0xFF);   // carry at bit 7?
+        rf.regs[AF].flags.z = (a + b == 0);
+        rf.regs[AF].flags.n = 0;
+    }
+
+    void compute_flags_sub8(int a, int b) {
+        rf.regs[AF].flags.h = ((b & 0xF) > (a & 0xF));              // borrow from bit 4?
+        rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
+        rf.regs[AF].flags.z = (a - b == 0);
+        rf.regs[AF].flags.n = 1;
     }
     
     //    blarggs test - serial output

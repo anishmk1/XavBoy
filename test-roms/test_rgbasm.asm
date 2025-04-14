@@ -10,3 +10,13 @@ Main:
     ld a, 0x81
     ld de, 0xff02   ; hl <= store addr of serial output valid
     ld [de], a
+    nop
+    ld a, 0x01
+    ld b, 0xff
+    add a, b
+    ld hl, 0x1234
+    ld [hl], 0xab
+    add a, [hl]
+    adc a, [hl]
+    ld b, 0x4f
+    sbc a, b

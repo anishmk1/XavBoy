@@ -74,12 +74,12 @@ int main(int argc, char* argv[]) {
 
     setup_serial_output();
 
-    CPU *cpu = new CPU();
-    Reg (&regs)[NUM_REGS] = cpu->rf.regs;
-
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
     Memory *mem = new Memory();
+    CPU *cpu = new CPU(mem);
+    Reg (&regs)[NUM_REGS] = cpu->rf.regs;
+
 
     size_t file_size;
     uint8_t *rom_ptr;
