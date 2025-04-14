@@ -20,3 +20,6 @@ Main:
     adc a, [hl]
     ld b, 0x4f
     sbc a, b
+    ld b, 0xff
+    and a, b
+    

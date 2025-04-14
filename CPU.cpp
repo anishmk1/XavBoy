@@ -360,13 +360,25 @@ public:
             rf.regs[AF].hi -= rf.get(r8);
             print (" A -= r[%s](0x%0x)\n", RegFile::get_reg_name(r8), rf.get(r8));
         } else if (match(cmd, "10011xxx")) {                // sbc a, r8
-            print ("   detected: sbc a, r8 ---");
+            print ("    detected: sbc a, r8 ---");
             int reg_bits = (cmd & 0b111);
             r8_index_t r8 = RegFile::get_r8(reg_bits);
 
             print (" A -= (r[%s]:0x%0x + carry(%0d))\n", RegFile::get_reg_name(r8), rf.get(r8), rf.regs[AF].flags.c);
             compute_flags_sub8(rf.get(A), (rf.get(r8) + rf.regs[AF].flags.c));
             rf.regs[AF].hi -= (rf.get(r8) + rf.regs[AF].flags.c);
+        } else if (match(cmd, "10100xxx")) {                // and a, r8
+            print ("    detected: and a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            rf.set(A, (rf.get(A) & rf.get(r8)));
+
+            rf.regs[AF].flags.z = (rf.get(A) == 0);
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 1; 
+            rf.regs[AF].flags.c = 0;
+            print (" A &= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
         }
 
         else {
