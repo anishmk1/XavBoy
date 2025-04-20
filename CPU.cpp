@@ -18,6 +18,7 @@ const int NUM_REGS = 6;
 
 enum reg_index_t {AF,BC,DE,HL,SP,PC};
 enum r8_index_t {A, B, C, D, E, H, L, hl, F};
+enum cc_t {nz, z, nc, c};
 
 union Reg {
     struct {
@@ -58,18 +59,27 @@ public:
 
     void set(r8_index_t r8, uint8_t val) {
         if (r8 == A) regs[AF].hi = val;
-        if (r8 == B) regs[BC].hi = val;
-        if (r8 == C) regs[BC].lo = val;
-        if (r8 == D) regs[DE].hi = val;
-        if (r8 == E) regs[DE].lo = val;
-        if (r8 == F) regs[AF].lo = val;
-        if (r8 == H) regs[HL].hi = val;
-        if (r8 == L) regs[HL].lo = val;
-        if (r8 == hl) mem->set(regs[HL].val, val);
+        else if (r8 == B) regs[BC].hi = val;
+        else if (r8 == C) regs[BC].lo = val;
+        else if (r8 == D) regs[DE].hi = val;
+        else if (r8 == E) regs[DE].lo = val;
+        else if (r8 == F) regs[AF].lo = val;
+        else if (r8 == H) regs[HL].hi = val;
+        else if (r8 == L) regs[HL].lo = val;
+        else if (r8 == hl) mem->set(regs[HL].val, val);
     }
 
     void set(reg_index_t r16, uint16_t val) {
         regs[r16].val = val;
+    }
+
+    bool check_cc(cc_t cc) {
+        if (cc == nz) return (regs[AF].flags.z != 1);
+        else if (cc == z) return (regs[AF].flags.z == 1);
+        else if (cc == nc) return (regs[AF].flags.c != 1);
+        else if (cc == c) return (regs[AF].flags.c == 1);
+        print ("   Unexpected index to check_cc: %d\n", cc);
+        exit(1);
     }
 
     static r8_index_t get_r8(int index) {
@@ -150,20 +160,25 @@ public:
 
 
     void execute(Memory *mem) {
+        bool nop = false;
 
         // uint16_t *reg_ptr;
         uint8_t cmd = mem->get(rf.regs[PC].val);
+
+        // increment PC
+        rf.regs[PC].val++;
 
         ///////////////////////
         //      BLOCK 0     //
         /////////////////////
         if (cmd == 0) {                                     // nop
+            nop = true;
             print ("    detected: nop\n");
         } else if (match(cmd, "00xx0001")) {                // ld r16, imm16
             print("    detected: ld r16, imm16 ---");
             // next 2 bytes are the immediate
             // FIXME: Does PC need to be incremented by 2 as well? Confirm
-            uint16_t imm16 = (mem->get(rf.regs[PC].val + 2) << 8) + mem->get(rf.regs[PC].val + 1);    // little endian imm16
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
             reg_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
             rf.regs[reg_idx].val = imm16;
             rf.regs[PC].val += 2;
@@ -187,7 +202,7 @@ public:
         } else if (match(cmd, "00001000")) {                // ld [imm16], sp
             print("    detected ld [imm16], sp\n");
             // next 2 bytes are the immediate
-            uint16_t imm16 = (mem->get(rf.regs[PC].val+2) << 8) + mem->get(rf.regs[PC].val+1);
+            uint16_t imm16 = (mem->get(rf.regs[PC].val+1) << 8) + mem->get(rf.regs[PC].val);
             rf.regs[SP].val = imm16;
             rf.regs[PC].val += 2;
 
@@ -223,13 +238,14 @@ public:
             print("    detected: dec r8 ---");
             int reg_bits = ((cmd >> 3) & 0b111);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
+            compute_flags_sub8(rf.get(reg_idx), 1);
             rf.set(reg_idx, rf.get(reg_idx) - 1); 
 
             print(" decrementing reg %s\n", RegFile::get_reg_name(reg_idx));
 
         } else if (match(cmd, "00xxx110")) {                // ld r8, imm8
             print("    detected: ld r8, imm8 ---");
-            uint8_t imm8 = mem->get(rf.regs[PC].val + 1);
+            uint8_t imm8 = mem->get(rf.regs[PC].val);
             int reg_bits = ((cmd >> 3) & 0b111);
             r8_index_t r8 = RegFile::get_r8(reg_bits);
             rf.set(r8, imm8);
@@ -299,16 +315,27 @@ public:
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
         } else if (match(cmd, "00011000")) {                // jr imm8
-            print("    detected: jr imm8\n");
-            int8_t imm8 = mem->get(rf.regs[PC].val + 1);
+            print("    detected: jr imm8 ---");
+            int8_t imm8 = mem->get(rf.regs[PC].val++);
             rf.regs[PC].val += imm8;
+            print (" PC <= 0x%0x\n", imm8);
+
+            //
+            //
+            //      currently debugging jr instr - compiler not providing imm in next byte??
+            //
+            //
         } else if (match(cmd, "001xx000")) {                // jr cond, imm8
-            print("    detected: jr cond, imm8\n");
-            int cc = (cmd >> 3) & 0b11;
-            // FIXME: assumption!! - cc refers to the bit index of the flag 
-            if ((rf.regs[AF].lo >> cc) & 0b1) {
-                int8_t imm8 = mem->get(rf.regs[PC].val + 1);
+            print("    detected: jr cond, imm8 ---");
+            cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
+
+           
+            if (rf.check_cc(cc)) {
+                int8_t imm8 = mem->get(rf.regs[PC].val++);
                 rf.regs[PC].val += imm8;
+                print (" cc: 0x%0x; branch taken: PC <= 0x%0x\n", cc, imm8);
+            } else {
+                print (" cc: 0x%0x; branch not taken\n", cc);
             }
         } else if (match(cmd, "00010000")) {                // stop
             print("    detected: stop\n");
@@ -385,7 +412,8 @@ public:
             print ("    default case\n");
         }
 
-        rf.print_regs();
+
+        if (!nop) rf.print_regs();
         serial_output(mem);
     }
 

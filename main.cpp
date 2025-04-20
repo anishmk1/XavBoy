@@ -83,7 +83,8 @@ int main(int argc, char* argv[]) {
 
     size_t file_size;
     uint8_t *rom_ptr;
-    rom_ptr = open_rom("./test-roms/test.gb", &file_size);
+    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
+    // rom_ptr = open_rom("./test-roms/test.gb", &file_size);
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
@@ -101,7 +102,5 @@ int main(int argc, char* argv[]) {
         printf ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
 
         cpu->execute(mem);
-        // increment PC
-        regs[PC].val++;
     }
 }
