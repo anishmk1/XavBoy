@@ -43,15 +43,15 @@ public:
         return mem[addr];
     }
 
-    void load_rom(uint8_t *rom_ptr, size_t file_size, bool load_boot_rom=false) {
-        int rom_start_addr = (load_boot_rom) ? 0 : 0x100;
-        printf ("Loading ROM into Memory Address 0x%0x....\n", rom_start_addr);
-        printf ("   file_size: %lu\n", file_size);
+    void load_rom(uint8_t *rom_ptr, size_t file_size) {
+        int rom_start_addr = (LOAD_BOOT_ROM) ? 0 : 0x100;
+        print ("Loading ROM into Memory Address 0x%0x....\n", rom_start_addr);
+        print ("   file_size: %lu\n", file_size);
         for (size_t i = 0; i < file_size; i++) {
             set(i + rom_start_addr, rom_ptr[i]); 
         }
         romSize = file_size;
-        printf ("Successfully loaded ROM!\n\n");
+        print ("Successfully loaded ROM!\n\n");
 
     }
 

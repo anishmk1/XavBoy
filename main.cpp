@@ -14,10 +14,32 @@
 #include <cstring> // For strcmp
 #include <cassert>
 
+#define printx(...)                            \
+    do {                                       \
+        printf(__VA_ARGS__);                   \
+    } while (0)
+
+
+#define print(...)                             \
+    do {                                       \
+        if (disable_prints == 0)               \
+            printf(__VA_ARGS__);               \
+    } while (0)
+
+
+#define printv(...)                                 \
+    do {                                            \
+        if (disable_prints == 0 && verbose == 1)    \
+            printf(__VA_ARGS__);                    \
+    } while (0)
+
+
 std::ofstream logFile;
 bool verbose = false;
-bool disable_prints = false;
-const bool LOAD_BOOT_ROM = false;
+bool disable_prints = true;
+const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
+const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
+const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
 #include "Memory.cpp"
 #include "CPU.cpp"
@@ -83,13 +105,13 @@ int main(int argc, char* argv[]) {
 
     size_t file_size;
     uint8_t *rom_ptr;
-    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
+    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/test.gb", &file_size);
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
     }
-    mem->load_rom(rom_ptr, file_size, LOAD_BOOT_ROM);
+    mem->load_rom(rom_ptr, file_size);
 
     if (munmap(rom_ptr, file_size) == -1) {
         perror("Error unmapping file");
@@ -99,8 +121,8 @@ int main(int argc, char* argv[]) {
     size_t num_bytes = 0;
     while (num_bytes++ < file_size) {
         // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
-        printf ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
+        print ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
 
-        cpu->execute(mem);
+        cpu->execute();
     }
 }

@@ -1,18 +1,6 @@
 const bool USE_R8_INDEX = true;
 const int NUM_REGS = 6;
 
-#define print(...)                             \
-    do {                                       \
-        if (disable_prints == 0)               \
-            printf(__VA_ARGS__);               \
-    } while (0)
-
-
-#define printv(...)                                 \
-    do {                                            \
-        if (disable_prints == 0 && verbose == 1)    \
-            printf(__VA_ARGS__);                    \
-    } while (0)
 
 // FIXME: Use maps to map index to r8/r16 regs. A lot of functions could use this
 
@@ -135,8 +123,14 @@ public:
     }
 
     void print_regs() {
-        print("    | AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x ||   znhc: %d%d%d%d ||   *[hl]: 0x%0x\n\n",
-                    regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c, mem->get(get(HL)));
+        if (GAMEBOY_DOCTOR) {
+            printx ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%02X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+                    get(A), get(F), get(B), get(C), get(D), get(E), get(H), get(L), get(SP), get(PC),
+                    mem->get(get(PC)), mem->get(get(PC)+1), mem->get(get(PC)+2), mem->get(get(PC)+3));
+        } else {
+            print ("    | AF: 0x%0x    BC: 0x%0x     DE: 0x%0x     HL: 0x%0x     SP: 0x%0x     PC: 0x%0x ||   znhc: %d%d%d%d ||   *[hl]: 0x%0x\n\n",
+                        regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c, mem->get(get(HL)));
+        }
     }
 };
 
@@ -144,26 +138,41 @@ public:
 class CPU {
 public:
 
+    Memory *mem;
     RegFile rf;
 
     // Default constructor
     CPU (Memory *mem) {
-        if (LOAD_BOOT_ROM) {
-            rf.regs[PC].val = 0;
-        } else {
-            rf.regs[PC].val = 0x100;
-        }
         rf.mem = mem;
+        this->mem = mem;
+
+        if (SKIP_BOOT_ROM) {
+            // Load initial system state after BOOT_ROM 
+            rf.set(A, 0x01);
+            rf.set(F, 0xB0);     // FIXME: In gameboy doctor docs: F	0xB0 (or CH-Z if managing flags individually)
+            rf.set(B, 0x00);
+            rf.set(C, 0x13);
+            rf.set(D, 0x00);
+            rf.set(E, 0xD8);
+            rf.set(H, 0x01);
+            rf.set(L, 0x4D);
+            rf.set(SP, 0xFFFE);
+            rf.set(PC, 0x100);
+        } else {
+            rf.regs[PC].val = 0;
+        }
     }
 
     // add a destructor
 
 
-    void execute(Memory *mem) {
+    void execute() {
         bool nop = false;
 
         // uint16_t *reg_ptr;
         uint8_t cmd = mem->get(rf.regs[PC].val);
+
+        if (GAMEBOY_DOCTOR) rf.print_regs();
 
         // increment PC
         rf.regs[PC].val++;
@@ -359,100 +368,148 @@ public:
             }
         }
         
-        ///////////////////////
-        //      BLOCK 2     //
-        /////////////////////
-        else if (match(cmd, "10000xxx")) {                  // add a, r8
-            print ("    detected: add a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+        /////////////////////////////////
+        //      BLOCK 2 / BLOCK 3     //
+        ///////////////////////////////
+        else if (match(cmd, "10000xxx") || match(cmd, "11000110")) {                  // add a, r8          add a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: add a, imm8 ---");
+            else print ("    detected: add a, r8 ---");            
+            
+            compute_flags_add8(rf.get(A), operand);
 
-            compute_flags_add8(rf.get(A), rf.get(r8));
-            rf.regs[AF].hi += rf.get(r8);
-            print (" A += r[%s](0x%0x)\n", RegFile::get_reg_name(r8), rf.get(r8));
-        } else if (match(cmd, "10001xxx")) {                // adc a, r8
-            print ("    detected: adc a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            rf.regs[AF].hi += operand;
+            print (" A += (0x%0x)\n", operand);
+        } else if (match(cmd, "10001xxx") || match(cmd, "11001110")) {                // adc a, r8          adc a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: adc a, imm8 ---");
+            else print ("    detected: adc a, r8 ---");
 
-            print (" A += carry(%0d) + r[%s](0x%0x)\n", rf.regs[AF].flags.c, RegFile::get_reg_name(r8), rf.get(r8));
-            compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, rf.get(r8));
-            rf.regs[AF].hi += (rf.regs[AF].flags.c + rf.get(r8));
-        } else if (match(cmd, "10010xxx")) {                // sub a, r8
-            print ("    detected: sub a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            print (" A += carry(%0d) + (0x%0x)\n", rf.regs[AF].flags.c, operand);
+            compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, operand);
+            rf.regs[AF].hi += (rf.regs[AF].flags.c + operand);
+        } else if (match(cmd, "10010xxx") || match(cmd, "11010110")) {                // sub a, r8          sub a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: sub a, imm8 ---");
+            else print ("    detected: sub a, r8 ---");
 
-            compute_flags_sub8(rf.get(A), rf.get(r8));
-            rf.regs[AF].hi -= rf.get(r8);
-            print (" A -= r[%s](0x%0x)\n", RegFile::get_reg_name(r8), rf.get(r8));
-        } else if (match(cmd, "10011xxx")) {                // sbc a, r8
-            print ("    detected: sbc a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            compute_flags_sub8(rf.get(A), operand);
+            rf.regs[AF].hi -= operand;
+            print (" A -= (0x%0x)\n", operand);
+        } else if (match(cmd, "10011xxx") || match(cmd, "11011110")) {                // sbc a, r8          sbc a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: sbc a, imm8 ---");
+            else print ("    detected: sbc a, r8 ---");
 
-            print (" A -= (r[%s]:0x%0x + carry(%0d))\n", RegFile::get_reg_name(r8), rf.get(r8), rf.regs[AF].flags.c);
-            compute_flags_sub8(rf.get(A), (rf.get(r8) + rf.regs[AF].flags.c));
-            rf.regs[AF].hi -= (rf.get(r8) + rf.regs[AF].flags.c);
-        } else if (match(cmd, "10100xxx")) {                // and a, r8
-            print ("    detected: and a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            print (" A -= (0x%0x + carry(%0d))\n", operand, rf.regs[AF].flags.c);
+            compute_flags_sub8(rf.get(A), (operand + rf.regs[AF].flags.c));
+            rf.regs[AF].hi -= (operand + rf.regs[AF].flags.c);
+        } else if (match(cmd, "10100xxx") || match(cmd, "11100110")) {                // and a, r8          and a, imm8 
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: and a, imm8 ---");
+            else print ("    detected: and a, r8 ---");
 
-            rf.set(A, (rf.get(A) & rf.get(r8)));
+            rf.set(A, (rf.get(A) & operand));
 
             rf.regs[AF].flags.z = (rf.get(A) == 0);
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 1; 
             rf.regs[AF].flags.c = 0;
-            print (" A &= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
-        } else if (match(cmd, "10101xxx")) {                // xor a, r8
-            print ("    detected: xor a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            print (" A &= 0x%0x\n", operand);
+        } else if (match(cmd, "10101xxx") || match(cmd, "11101110")) {                // xor a, r8          xor a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: xor a, imm8 ---");
+            else print ("    detected: xor a, r8 ---");
 
-            rf.set(A, (rf.get(A) ^ rf.get(r8)));
-
-            rf.regs[AF].flags.z = (rf.get(A) == 0);
-            rf.regs[AF].flags.n = 0;
-            rf.regs[AF].flags.h = 0; 
-            rf.regs[AF].flags.c = 0;
-            print (" A ^= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
-        } else if (match(cmd, "10110xxx")) {                // or a, r8 
-            print ("    detected: or a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
-
-            rf.set(A, (rf.get(A) | rf.get(r8)));
+            rf.set(A, (rf.get(A) ^ operand));
 
             rf.regs[AF].flags.z = (rf.get(A) == 0);
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0; 
             rf.regs[AF].flags.c = 0;
-            print (" A |= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
-        } else if (match(cmd, "10111xxx")) {                // cp a, r8
-            print ("    detected: cp a, r8 ---");
-            int reg_bits = (cmd & 0b111);
-            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            print (" A ^= 0x%0x\n", operand);
+        } else if (match(cmd, "10110xxx") || match(cmd, "11110110")) {                // or a, r8           or a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: or a, imm8 ---");
+            else print ("    detected: or a, r8 ---");
 
-            compute_flags_sub8(rf.get(A), rf.get(r8));
+            rf.set(A, (rf.get(A) | operand));
+
+            rf.regs[AF].flags.z = (rf.get(A) == 0);
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0; 
+            rf.regs[AF].flags.c = 0;
+            print (" A |= 0x%0x\n", operand);
+        } else if (match(cmd, "10111xxx") || match(cmd, "11111110")) {                // cp a, r8           cp a, imm8
+            uint8_t operand;
+            if (get_block2_3_operand(cmd, operand)) print ("    detected: cp a, imm8 ---");
+            else print ("    detected: cp a, r8 ---");
+
+            compute_flags_sub8(rf.get(A), operand);
         } 
 
         ///////////////////////
         //      BLOCK 3     //
         /////////////////////
+        else if (match(cmd, "110xx000")) {                  // ret cond
+            print ("    detected: ret cond\n");
+            cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
+
+            if (rf.check_cc(cc)) {
+                pop_r16_stack(PC);      // ret ~= POP PC (Move PC to return address:head of stack; then incr stack pointer to "pop")
+            }
+        } else if (match(cmd, "11001001")) {                // ret
+            print ("    detected: ret\n");
+                
+            pop_r16_stack(PC);      // ret ~= POP PC (Move PC to return address:head of stack; then incr stack pointer to "pop")
+        } else if (match(cmd, "11011001")) {                // reti
+            print ("    detected: reti\n");
+
+            pop_r16_stack(PC);
+            IME_nxt = 1;    // Enable Interrupts next cycle
+        } else if (match(cmd, "110xx010")) {                // jp cond, imm16
+            print ("    detected: jp cond, imm16\n");
+            cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
+
+            if (rf.check_cc(cc)) {
+                uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
+                rf.set(PC, imm16);
+            }
+        } else if (match(cmd, "11000011")) {                // jp imm16
+            print ("    detected: jp cond, imm16\n");
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
+            rf.set(PC, imm16);
+        } else if (match(cmd, "11101001")) {                // jp hl
+            print ("    detected: jp hl\n");
+            rf.set(PC, rf.get(HL));
+        } else if (match(cmd, "110xx100")) {                // call cond, imm16
+            print ("    detected: call cond, imm16\n");
+
+
+        } else if (match(cmd, "11001101")) {                // call imm16
+            print ("    detected: call imm16\n");
+
+        }
 
         else {
             print ("    default case\n");
         }
 
 
-        if (!nop) rf.print_regs();
-        serial_output(mem);
+        if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
+
+        flopped_updates();
+        serial_output();
     }
 
 
 private:
+
+    bool IME = 0;   // Interrupt Master Enable - - - disabled at game start
+
+    bool IME_nxt = 0;   // used to set IME on the next to next cycle
+    bool IME_set = 0;   // used to set IME on the next cycle
+
     // Implement wildcard matching - cmd=1010 matches compare="10xx"
     bool match(uint8_t cmd, const char *compare) {
         int cmd_bit, compare_bit;
@@ -479,9 +536,47 @@ private:
         rf.regs[AF].flags.z = (a - b == 0);
         rf.regs[AF].flags.n = 1;
     }
+
+    void flopped_updates() {
+        if (IME_nxt) {
+            IME_set = 1;
+            IME_nxt = 0;
+        } else if (IME_set) {
+            IME = 1;
+            IME_set = 0;
+        }
+    }
+
+    bool get_block2_3_operand(uint8_t cmd, uint8_t &operand) {
+        bool imm_or_reg;
+        if ((cmd >> 6) & 0b1) {
+            operand = mem->get(rf.regs[PC].val);     // imm8
+            imm_or_reg = true;
+        } else {
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+            operand = rf.get(r8);
+            imm_or_reg = false;
+        }
+
+        return imm_or_reg;
+    }
+
+    void pop_r16_stack(reg_index_t r16) {
+        // load [SP] into r16       (in little endian)
+        rf.regs[r16].lo = mem->get(rf.get(SP));
+        rf.regs[r16].hi = mem->get(rf.get(SP) + 1);
+
+        // increment SP (stack grows from high mem to low mem - so incrementing head of the stack shrinks the stack)
+        rf.set(SP, rf.get(SP) + 2);
+    }
+
+    void push_r16_stack(reg_index_t r16) {
+        
+    }
     
     //    blarggs test - serial output
-    void serial_output(Memory *mem) {
+    void serial_output() {
         if (mem->get(0xff02) == 0x81) {
             char c = '0' + mem->get(0xff01);
             // print("%c", c);
