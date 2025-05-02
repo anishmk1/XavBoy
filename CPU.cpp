@@ -406,7 +406,41 @@ public:
             rf.regs[AF].flags.h = 1; 
             rf.regs[AF].flags.c = 0;
             print (" A &= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
-        }
+        } else if (match(cmd, "10101xxx")) {                // xor a, r8
+            print ("    detected: xor a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            rf.set(A, (rf.get(A) ^ rf.get(r8)));
+
+            rf.regs[AF].flags.z = (rf.get(A) == 0);
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0; 
+            rf.regs[AF].flags.c = 0;
+            print (" A ^= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
+        } else if (match(cmd, "10110xxx")) {                // or a, r8 
+            print ("    detected: or a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            rf.set(A, (rf.get(A) | rf.get(r8)));
+
+            rf.regs[AF].flags.z = (rf.get(A) == 0);
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0; 
+            rf.regs[AF].flags.c = 0;
+            print (" A |= r[%s]:0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
+        } else if (match(cmd, "10111xxx")) {                // cp a, r8
+            print ("    detected: cp a, r8 ---");
+            int reg_bits = (cmd & 0b111);
+            r8_index_t r8 = RegFile::get_r8(reg_bits);
+
+            compute_flags_sub8(rf.get(A), rf.get(r8));
+        } 
+
+        ///////////////////////
+        //      BLOCK 3     //
+        /////////////////////
 
         else {
             print ("    default case\n");
