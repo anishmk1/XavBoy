@@ -6,7 +6,15 @@ const int NUM_REGS = 6;
 
 enum reg_index_t {AF,BC,DE,HL,SP,PC};
 enum r8_index_t {A, B, C, D, E, H, L, hl, F};
+enum r16mem_index_t {_BC, _DE, _HLi, _HLd};
 enum cc_t {nz, z, nc, c};
+
+struct ExcludeFlags {
+    bool no_z = false;
+    bool no_n = false;
+    bool no_h = false;
+    bool no_c = false;
+};
 
 union Reg {
     struct {
@@ -42,6 +50,14 @@ public:
         if (r8 == L) return regs[HL].lo;
         if (r8 == hl) return mem->get(regs[HL].val);
         print (" Unexpected index to get(r8_index_t) \n");
+        exit(1);
+    }
+    uint16_t get(r16mem_index_t r16mem, bool modify=false) {
+        if (r16mem == _BC) return regs[BC].val;
+        if (r16mem == _DE) return regs[DE].val;
+        if (r16mem == _HLi) return ((modify) ? regs[HL].val++ : regs[HL].val);
+        if (r16mem == _HLd) return ((modify) ? regs[HL].val-- : regs[HL].val);
+        printx (" Unexpected index to get(r16mem_index_t) \n");
         exit(1);
     }
 
@@ -90,7 +106,16 @@ public:
         if (index == 1) return DE;
         if (index == 2) return HL;
         if (index == 3) return SP;
-        print ("   Unexpected index to get_r16: %d\n", index);
+        printx ("   Unexpected index to get_r16: %d\n", index);
+        exit(1);
+    }
+
+    static r16mem_index_t get_r16mem(int index) {
+        if (index == 0) return _BC;
+        if (index == 1) return _DE;
+        if (index == 2) return _HLi;
+        if (index == 3) return _HLd;
+        printx ("   Unexpected index to get_r16mem: %0d\n", index);
         exit(1);
     }
 
@@ -195,18 +220,17 @@ public:
             print (" r[%s] <= 0x%0x\n", RegFile::get_reg_name(reg_idx), imm16);
         } else if (match(cmd, "00xx0010")) {                // ld [r16mem], a
             print("    detected: ld dest[r16mem], a ----");
-            int reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
-            mem->set(rf.regs[reg_idx].val, (rf.regs[AF].hi));
+            r16mem_index_t reg_idx = RegFile::get_r16mem(((cmd >> 4) & 0b11));
+            mem->set(rf.get(reg_idx), rf.regs[AF].hi);
 
-            print(" mem[0x%0x] = 0x%0x\n", rf.regs[reg_idx].val, mem->get(rf.regs[reg_idx].val));
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00xx1010")) {                // ld a, [r16mem]	
             print("    detected: ld a, source[r16mem]\n");
-            // FIXME: Create decode functions. Below only works because firts 2 bits are 00
-            int reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
-            rf.regs[AF].hi = ((mem->get(rf.regs[reg_idx].val)) << 8);
+            r16mem_index_t reg_idx = RegFile::get_r16mem(((cmd >> 4) & 0b11));
+            int addr = rf.get(reg_idx, true); // increment HL after reading
+
+            rf.regs[AF].hi = (mem->get(addr));
             
-            printv("    log: loaded (from mem) 0x%0x ---> A (0x%0x)\n", rf.regs[reg_idx].val, (rf.regs[AF].val >> 8));
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00001000")) {                // ld [imm16], sp
             print("    detected ld [imm16], sp\n");
@@ -231,14 +255,10 @@ public:
 
         } else if (match(cmd, "00xxx100")) {                // inc r8
             print("    detected: inc r8 ---");
-            // use r8 index to get the pointer of the full r16 reg
-            // then manipulate the lower/upper byte as needed to emulate 8 bit addition
-            // i.e. overflow/underflow of the upper/lower byte should not affect the other byte
-            // e.g DE = 03_FF should result in 03_00 after inc r8 of the lower byte
-            // FIXME: CONFIRM THIS !!
             int reg_bits = ((cmd >> 3) & 0b111);
             // reg_index_t reg_idx = RegFile::get_r16(reg_bits, USE_R8_INDEX);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
+            compute_flags_add8(rf.get(reg_idx), 1, ExcludeFlags{no_c: true});
             rf.set(reg_idx, rf.get(reg_idx) + 1);
 
             print(" incrementing reg %s\n", RegFile::get_reg_name(reg_idx));
@@ -247,7 +267,7 @@ public:
             print("    detected: dec r8 ---");
             int reg_bits = ((cmd >> 3) & 0b111);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
-            compute_flags_sub8(rf.get(reg_idx), 1);
+            compute_flags_sub8(rf.get(reg_idx), 1, ExcludeFlags{no_c: true});
             rf.set(reg_idx, rf.get(reg_idx) - 1); 
 
             print(" decrementing reg %s\n", RegFile::get_reg_name(reg_idx));
@@ -325,22 +345,25 @@ public:
             rf.regs[AF].flags.h = 0;
         } else if (match(cmd, "00011000")) {                // jr imm8
             print("    detected: jr imm8 ---");
-            int8_t imm8 = mem->get(rf.regs[PC].val++);
+            int8_t imm8 = mem->get(rf.regs[PC].val);
+            rf.regs[PC].val++;          // JR instr is 2 bytes long. So PC is incremented once to cover reading the imm8. Then the actual jump is done
             rf.regs[PC].val += imm8;
-            print (" PC <= 0x%0x\n", imm8);
+            print (" PC += 0x%0x\n", imm8);
 
             //
             //
-            //      currently debugging jr instr - compiler not providing imm in next byte??
+            //      DOCUMENTING PAST ISSUE: 
+            //      currently debugging jr instr - RGBASM compiler not providing imm in next byte??
+            //      FOr some reason, imm8 is placed somewhere way later than the next byte when compiled with RGBASM
             //
             //
         } else if (match(cmd, "001xx000")) {                // jr cond, imm8
             print("    detected: jr cond, imm8 ---");
             cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
+            int8_t imm8 = mem->get(rf.regs[PC].val);
+            rf.regs[PC].val++;      // JR instr is 2 bytes long. So PC is incremented once regardless of branch taken/not to cover reading the imm8. Then the actual jump is done
 
-           
             if (rf.check_cc(cc)) {
-                int8_t imm8 = mem->get(rf.regs[PC].val++);
                 rf.regs[PC].val += imm8;
                 print (" cc: 0x%0x; branch taken: PC <= 0x%0x\n", cc, imm8);
             } else {
@@ -523,18 +546,18 @@ private:
         return true;
     }
 
-    void compute_flags_add8(int a, int b) {
-        rf.regs[AF].flags.h = (((a & 0x0F) + (b & 0x0F)) > 0x0F);   // carry at bit 3?
-        rf.regs[AF].flags.c = (((a & 0xFF) + (b & 0xFF)) > 0xFF);   // carry at bit 7?
-        rf.regs[AF].flags.z = (a + b == 0);
-        rf.regs[AF].flags.n = 0;
+    void compute_flags_add8(int a, int b, ExcludeFlags ex = ExcludeFlags()) {
+        if (!ex.no_z) rf.regs[AF].flags.z = ((((a & 0xFF) + (b & 0xFF)) & 0xFF) == 0);
+        if (!ex.no_n) rf.regs[AF].flags.n = 0;
+        if (!ex.no_h) rf.regs[AF].flags.h = (((a & 0x0F) + (b & 0x0F)) > 0x0F);   // carry at bit 3?
+        if (!ex.no_c) rf.regs[AF].flags.c = (((a & 0xFF) + (b & 0xFF)) > 0xFF);   // carry at bit 7?
     }
 
-    void compute_flags_sub8(int a, int b) {
-        rf.regs[AF].flags.h = ((b & 0xF) > (a & 0xF));              // borrow from bit 4?
-        rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
-        rf.regs[AF].flags.z = (a - b == 0);
-        rf.regs[AF].flags.n = 1;
+    void compute_flags_sub8(int a, int b, ExcludeFlags ex = ExcludeFlags()) {
+        if (!ex.no_z) rf.regs[AF].flags.z = ((((a & 0xFF) - (b & 0xFF)) & 0xFF) == 0);
+        if (!ex.no_n) rf.regs[AF].flags.n = 1;
+        if (!ex.no_h) rf.regs[AF].flags.h = ((b & 0xF) > (a & 0xF));              // borrow from bit 4?
+        if (!ex.no_c) rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
     }
 
     void flopped_updates() {
@@ -571,9 +594,9 @@ private:
         rf.set(SP, rf.get(SP) + 2);
     }
 
-    void push_r16_stack(reg_index_t r16) {
-        
-    }
+    // void push_r16_stack(reg_index_t r16) {
+
+    // }
     
     //    blarggs test - serial output
     void serial_output() {

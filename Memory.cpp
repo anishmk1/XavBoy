@@ -53,6 +53,15 @@ public:
         romSize = file_size;
         print ("Successfully loaded ROM!\n\n");
 
+        // dump_mem(300);
+    }
+
+    void dump_mem(int range = MEMORY_SIZE) {
+        for (int i = 0; i < range; i++) {
+            if (i % 16 == 0) printx ("\n");
+            printx ("mem[0x%0x]=0x%0x;  ", i, mem[i]);
+        }
+        printx ("\n\n");
     }
 
     // void dump_ROM() {
