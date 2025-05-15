@@ -482,7 +482,12 @@ public:
             }
         } else if (match(cmd, "11001001")) {                // ret
             print ("    detected: ret\n");
-                
+            
+            
+            // printx ("around 0xdffd\n");
+            // mem->dump_mem(0xdffd);
+            // printx ("around 0x00cd\n");
+            // mem->dump_mem(0x00cd);
             pop_r16_stack(PC);      // ret ~= POP PC (Move PC to return address:head of stack; then incr stack pointer to "pop")
         } else if (match(cmd, "11011001")) {                // reti
             print ("    detected: reti\n");
@@ -508,11 +513,11 @@ public:
             print ("    detected: call cond, imm16\n");
 
             cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
+            rf.regs[PC].val += 2;
 
             if (rf.check_cc(cc)) {
-                uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
-                rf.regs[PC].val += 2;
-                uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
+                uint16_t return_addr = rf.regs[PC].val;    // little endian retn addr
 
                 push_val_stack(return_addr);
                 rf.set(PC, imm16);
@@ -525,7 +530,8 @@ public:
             // And PC + 2 refers to the byte after the call instr - return addr
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
             rf.regs[PC].val += 2;
-            uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
+            uint16_t return_addr = rf.regs[PC].val;
+
 
             push_val_stack(return_addr);
             rf.set(PC, imm16);
@@ -543,7 +549,13 @@ public:
 
             r16_index_t r16 = RegFile::get_r16(((cmd >> 4) & 0x11));
             pop_r16_stack(r16);
-        } 
+        } else if (match(cmd, "11xx0101")) {                // push r16stk
+            print ("    detected: pop r16stk\n");
+
+            r16_index_t r16 = RegFile::get_r16(((cmd >> 4) & 0x11));
+            uint16_t val = rf.get(r16);
+            push_val_stack(val);
+        }
         
         // FIXME: PREFIX BLOCK: How do these work?
 
@@ -562,7 +574,7 @@ public:
 
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
             rf.regs[PC].val += 2;
-            rf.set(A, imm16);
+            mem->set(imm16, rf.get(A));
         } else if (match(cmd, "11110010")) {                // ldh a, [c]
             print ("    detected: ldh a, [c]\n");
 
@@ -695,10 +707,12 @@ private:
     void pop_r16_stack(r16_index_t r16) {
         // load [SP] into r16       (in little endian)
         rf.regs[r16].lo = mem->get(rf.get(SP));
-        rf.regs[r16].hi = mem->get(rf.get(SP) + 1);
+        rf.set(SP, rf.get(SP) + 1);
+        rf.regs[r16].hi = mem->get(rf.get(SP));
+        rf.set(SP, rf.get(SP) + 1);
 
-        // increment SP (stack grows from high mem to low mem - so incrementing head of the stack shrinks the stack)
-        rf.set(SP, rf.get(SP) + 2);
+        // // increment SP (stack grows from high mem to low mem - so incrementing head of the stack shrinks the stack)
+        // rf.set(SP, rf.get(SP) + 2);
     }
 
 
@@ -719,11 +733,16 @@ private:
 
         // Write retn addr to stack then update stack pointer (grows from high addr to low addr)
         // 1. Write lower byte of retn addr to SP - 1
-        mem->set(rf.get(SP) - 1, (val & 0xff));
-        // 2. Write higher byte of retn addr to SP - 2
-        mem->set(rf.get(SP) - 1, ((val >> 8) & 0xff));
-        // 3. Set SP = SP - 2;
-        rf.set(SP, rf.get(SP) - 2);
+        // mem->set(rf.get(SP) - 1, (val & 0xff));
+        // // 2. Write higher byte of retn addr to SP - 2
+        // mem->set(rf.get(SP) - 1, ((val >> 8) & 0xff));
+        // // 3. Set SP = SP - 2;
+        // rf.set(SP, rf.get(SP) - 2);
+
+        rf.set(SP, rf.get(SP) - 1);   // decrement SP
+        mem->set(rf.get(SP), (val >> 8) & 0xff);
+        rf.set(SP, rf.get(SP) - 1);   // decrement SP
+        mem->set(rf.get(SP), val & 0xff);
     }
     
     //    blarggs test - serial output

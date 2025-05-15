@@ -56,8 +56,10 @@ public:
         // dump_mem(300);
     }
 
-    void dump_mem(int range = MEMORY_SIZE) {
-        for (int i = 0; i < range; i++) {
+    void dump_mem(int around = 25, int range = 50) {
+        int start = around - (range / 2);
+        int end = around + (range / 2);
+        for (int i = start; i < end; i++) {
             if (i % 16 == 0) printx ("\n");
             printx ("mem[0x%0x]=0x%0x;  ", i, mem[i]);
         }
