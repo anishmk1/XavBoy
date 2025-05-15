@@ -4,7 +4,7 @@ const int NUM_REGS = 6;
 
 // FIXME: Use maps to map index to r8/r16 regs. A lot of functions could use this
 
-enum reg_index_t {AF,BC,DE,HL,SP,PC};
+enum r16_index_t {AF,BC,DE,HL,SP,PC};
 enum r8_index_t {A, B, C, D, E, H, L, hl, F};
 enum r16mem_index_t {_BC, _DE, _HLi, _HLd};
 enum cc_t {nz, z, nc, c};
@@ -36,7 +36,7 @@ public:
     Reg regs[NUM_REGS];
     Memory *mem;        // for [hl]
 
-    uint16_t get(reg_index_t r16) {
+    uint16_t get(r16_index_t r16) {
         return regs[r16].val;
     }
     uint8_t get(r8_index_t r8) {
@@ -73,7 +73,7 @@ public:
         else if (r8 == hl) mem->set(regs[HL].val, val);
     }
 
-    void set(reg_index_t r16, uint16_t val) {
+    void set(r16_index_t r16, uint16_t val) {
         regs[r16].val = val;
     }
 
@@ -100,7 +100,7 @@ public:
         exit(1);
     }
 
-    static reg_index_t get_r16(int index) {
+    static r16_index_t get_r16(int index) {
 
         if (index == 0) return BC;
         if (index == 1) return DE;
@@ -135,7 +135,7 @@ public:
     }
 
 
-    static const char* get_reg_name(reg_index_t r16) {
+    static const char* get_reg_name(r16_index_t r16) {
         if (r16 == AF) return "AF";
         if (r16 == BC) return "BC";
         if (r16 == DE) return "DE";
@@ -213,7 +213,7 @@ public:
             // next 2 bytes are the immediate
             // FIXME: Does PC need to be incremented by 2 as well? Confirm
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
-            reg_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
+            r16_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
             rf.regs[reg_idx].val = imm16;
             rf.regs[PC].val += 2;
 
@@ -256,9 +256,8 @@ public:
         } else if (match(cmd, "00xxx100")) {                // inc r8
             print("    detected: inc r8 ---");
             int reg_bits = ((cmd >> 3) & 0b111);
-            // reg_index_t reg_idx = RegFile::get_r16(reg_bits, USE_R8_INDEX);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
-            compute_flags_add8(rf.get(reg_idx), 1, ExcludeFlags{no_c: true});
+            compute_flags_add8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
             rf.set(reg_idx, rf.get(reg_idx) + 1);
 
             print(" incrementing reg %s\n", RegFile::get_reg_name(reg_idx));
@@ -267,7 +266,7 @@ public:
             print("    detected: dec r8 ---");
             int reg_bits = ((cmd >> 3) & 0b111);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
-            compute_flags_sub8(rf.get(reg_idx), 1, ExcludeFlags{no_c: true});
+            compute_flags_sub8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
             rf.set(reg_idx, rf.get(reg_idx) - 1); 
 
             print(" decrementing reg %s\n", RegFile::get_reg_name(reg_idx));
@@ -508,10 +507,117 @@ public:
         } else if (match(cmd, "110xx100")) {                // call cond, imm16
             print ("    detected: call cond, imm16\n");
 
+            cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
 
+            if (rf.check_cc(cc)) {
+                uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
+                rf.regs[PC].val += 2;
+                uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
+
+                push_val_stack(return_addr);
+                rf.set(PC, imm16);
+            }
         } else if (match(cmd, "11001101")) {                // call imm16
             print ("    detected: call imm16\n");
+            // call ~= push addr of next instr (return instr) onto the stack and then jump to imm16
 
+            // call is 3 bytes. So PC, PC + 1 refers to the imm16 bytes of the instr
+            // And PC + 2 refers to the byte after the call instr - return addr
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
+            rf.regs[PC].val += 2;
+            uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
+
+            push_val_stack(return_addr);
+            rf.set(PC, imm16);
+
+        } else if (match(cmd, "11xxx111")) {                // rst tgt3
+            print ("    detected: rst tgt3\n");
+
+            uint16_t target_addr = (((cmd >> 3) & 0x111) << 3);     // tgt3 encodes the target address divided by 8.
+            uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
+
+            push_val_stack(return_addr);
+            rf.set(PC, target_addr);
+        } else if (match(cmd, "11xx0001")) {                // pop r16stk
+            print ("    detected: pop r16stk\n");
+
+            r16_index_t r16 = RegFile::get_r16(((cmd >> 4) & 0x11));
+            pop_r16_stack(r16);
+        } 
+        
+        // FIXME: PREFIX BLOCK: How do these work?
+
+          else if (match(cmd, "11100010")) {                // ldh [c], a
+            print ("    detected: ldh [c], a\n");
+
+            mem->set(0xff00 + rf.get(C), rf.get(A));
+        } else if (match(cmd, "11100000")) {                // ldh imm8, a
+            print ("    detected: ldh imm8, a\n");
+
+            uint8_t imm8 = mem->get(rf.get(PC)); 
+            rf.regs[PC].val += 1;
+            mem->set(0xff00 + imm8, rf.get(A));
+        } else if (match(cmd, "11101010")) {                // ld [imm16], a
+            print ("    detected: ld [imm16], a\n");
+
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
+            rf.regs[PC].val += 2;
+            rf.set(A, imm16);
+        } else if (match(cmd, "11110010")) {                // ldh a, [c]
+            print ("    detected: ldh a, [c]\n");
+
+            rf.set(A, mem->get(0xff00 + rf.get(C)));
+        } else if (match(cmd, "11110000")) {                // ldh a, [imm8]
+            print ("    detected: ldh a, [imm8]\n");
+
+            // FIXME: this is unclear in the docs. direct mem access of imm8 means addresses from 0x0000 to 0x00ff
+            // But valid mem addresses shoudl be between 0xff00 and 0xffff. So offsetting this imm8 similar to ldh a [c]
+            // Confirm this..
+            uint8_t imm8 = mem->get(rf.get(PC));
+            rf.regs[PC].val++;
+            rf.set(A, mem->get(0xff00 + imm8));
+        } else if (match(cmd, "11111010")) {                // ld a, [imm16]
+            print ("    detected: ld a, [imm16]\n");
+
+            uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
+            rf.regs[PC].val += 2;
+            if (imm16 > 0xff00 && imm16 < 0xffff) {
+                rf.set(A, mem->get(imm16));
+            }
+        } else if (match(cmd, "11101000")) {                // add sp, imm8
+            print ("    detected: add sp, imm8\n");
+
+            int8_t imm8 = mem->get(rf.get(PC));     // signed imm8
+            rf.regs[PC].val++;
+
+            // FIXME: does this work? Passing in rf.get(SP) : 16 bit value into 8 bit compute add flags
+            compute_flags_add8(rf.get(SP), imm8, ExcludeFlags{.no_z = true});
+            rf.regs[AF].flags.z = 0;
+
+            rf.set(SP, rf.get(SP) + imm8);
+        } else if (match(cmd, "11111000")) {                // ld hl, sp + imm8
+            print ("    detected: ld hl, sp + imm8\n");
+
+            int8_t imm8 = mem->get(rf.get(PC));     // signed imm8]
+            rf.regs[PC].val++;
+
+            // FIXME: does this work? Passing in rf.get(SP) : 16 bit value into 8 bit compute add flags
+            compute_flags_add8(rf.get(SP), imm8, ExcludeFlags{.no_z = true});
+            rf.regs[AF].flags.z = 0;
+
+            rf.set(HL, rf.get(SP) + imm8);
+        } else if (match(cmd, "11111001")) {                // ld sp, hl
+            print ("    detected: ld sp, hl\n");
+            
+            rf.set(SP, rf.get(HL));
+        } else if (match(cmd, "11110011")) {                // di
+            print ("    detected: di\n");
+
+            IME = 0;
+        } else if (match(cmd, "11111011")) {                // ei
+            print ("    detected: ei\n");
+
+            IME_nxt = 1;
         }
 
         else {
@@ -582,10 +688,11 @@ private:
             imm_or_reg = false;
         }
 
+        rf.regs[PC].val += 1;
         return imm_or_reg;
     }
 
-    void pop_r16_stack(reg_index_t r16) {
+    void pop_r16_stack(r16_index_t r16) {
         // load [SP] into r16       (in little endian)
         rf.regs[r16].lo = mem->get(rf.get(SP));
         rf.regs[r16].hi = mem->get(rf.get(SP) + 1);
@@ -594,9 +701,30 @@ private:
         rf.set(SP, rf.get(SP) + 2);
     }
 
-    // void push_r16_stack(reg_index_t r16) {
 
-    // }
+    /**
+     * Higher addresses
+        0xffff  | ff
+        0xfffe  | cd
+        0xfffd  | ab  <---- SP (retn addr abcd)
+        0xfffc  | ff
+        .
+        .
+        .
+        0x0000
+     * Lower addresses
+     */
+
+    void push_val_stack(uint16_t val) {
+
+        // Write retn addr to stack then update stack pointer (grows from high addr to low addr)
+        // 1. Write lower byte of retn addr to SP - 1
+        mem->set(rf.get(SP) - 1, (val & 0xff));
+        // 2. Write higher byte of retn addr to SP - 2
+        mem->set(rf.get(SP) - 1, ((val >> 8) & 0xff));
+        // 3. Set SP = SP - 2;
+        rf.set(SP, rf.get(SP) - 2);
+    }
     
     //    blarggs test - serial output
     void serial_output() {
