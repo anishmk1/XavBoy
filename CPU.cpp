@@ -119,6 +119,15 @@ public:
         exit(1);
     }
 
+    static r16_index_t get_r16stk(int index) {
+        if (index == 0) return BC;
+        if (index == 1) return DE;
+        if (index == 2) return HL;
+        if (index == 3) return AF;
+        printx ("   Unexpected index to get_r16stk: %0d\n", index);
+        exit(1);
+    }
+
     static const char* get_reg_name(r8_index_t r8) {
         if (r8 == A) return "A";
         if (r8 == B) return "B";
@@ -547,13 +556,14 @@ public:
         } else if (match(cmd, "11xx0001")) {                // pop r16stk
             print ("    detected: pop r16stk\n");
 
-            r16_index_t r16 = RegFile::get_r16(((cmd >> 4) & 0x11));
-            pop_r16_stack(r16);
+            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0x11));
+            pop_r16_stack(r16stk);
+
         } else if (match(cmd, "11xx0101")) {                // push r16stk
             print ("    detected: pop r16stk\n");
 
-            r16_index_t r16 = RegFile::get_r16(((cmd >> 4) & 0x11));
-            uint16_t val = rf.get(r16);
+            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0x11));
+            uint16_t val = rf.get(r16stk);
             push_val_stack(val);
         }
         
@@ -714,7 +724,6 @@ private:
         // // increment SP (stack grows from high mem to low mem - so incrementing head of the stack shrinks the stack)
         // rf.set(SP, rf.get(SP) + 2);
     }
-
 
     /**
      * Higher addresses
