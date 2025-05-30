@@ -295,6 +295,9 @@ public:
             rf.regs[AF].hi = rf.regs[AF].hi << 1;
             rf.regs[AF].hi |= msb;     // rotate msb into lsb
             rf.regs[AF].flags.c = msb;       // Update Carry Flag
+            rf.regs[AF].flags.z = 0;
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0;
             print("rotated left A. carry=msb=%d\n", msb);
         } else if (match(cmd, "00001111")) {                // rrca
             print("    detected: rrca --- ");
@@ -302,6 +305,9 @@ public:
             rf.regs[AF].hi = rf.regs[AF].hi >> 1;
             rf.regs[AF].hi |= (lsb << 7);     // rotate lsb into msb
             rf.regs[AF].flags.c = lsb;       // Update Carry Flag
+            rf.regs[AF].flags.z = 0;
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0;
             print("rotated right A. carry=lsb=%d\n", lsb);
         } else if (match(cmd, "00010111")) {                // rla
             print("    detected: rla --- ");
@@ -309,13 +315,21 @@ public:
             rf.regs[AF].hi = rf.regs[AF].hi << 1;
             rf.regs[AF].hi |= rf.regs[AF].flags.c;
             rf.regs[AF].flags.c = msb;
+            rf.regs[AF].flags.z = 0;
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0;
             print("rotated left A. carry=msb=%d\n", msb);
         } else if (match(cmd, "00011111")) {                // rra
             print("    detected: rra --- ");
-            int lsb = rf.regs[AF].hi & 0b1;
-            rf.regs[AF].hi = rf.regs[AF].hi >> 1;
-            rf.regs[AF].hi |= (rf.regs[AF].flags.c << 7);
+            uint8_t val = rf.get(A);
+            int lsb = val & 0b1;
+            val = val >> 1;
+            val |= (rf.regs[AF].flags.c << 7);
+            rf.set(A, val);
             rf.regs[AF].flags.c = lsb;
+            rf.regs[AF].flags.z = 0;
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = 0;
             print("rotated left A. carry=lsb=%d\n", lsb);
         } else if (match(cmd, "00100111")) {                // daa
             print("    detected: daa --- \n");
@@ -416,9 +430,12 @@ public:
             if (get_block2_3_operand(cmd, operand)) print ("    detected: adc a, imm8 ---");
             else print ("    detected: adc a, r8 ---");
 
+            uint8_t val = rf.get(A) + rf.regs[AF].flags.c + operand;
             print (" A += carry(%0d) + (0x%0x)\n", rf.regs[AF].flags.c, operand);
+
             compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, operand);
-            rf.regs[AF].hi += (rf.regs[AF].flags.c + operand);
+            rf.set(A, val);
+            // rf.regs[AF].hi += (rf.regs[AF].flags.c + operand);
         } else if (match(cmd, "10010xxx") || match(cmd, "11010110")) {                // sub a, r8          sub a, imm8
             uint8_t operand;
             if (get_block2_3_operand(cmd, operand)) print ("    detected: sub a, imm8 ---");
@@ -565,11 +582,121 @@ public:
             r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0b11));
             uint16_t val = rf.get(r16stk);
             push_val_stack(val);
-        }
+        } 
         
-        // FIXME: PREFIX BLOCK: How do these work?
 
-          else if (match(cmd, "11100010")) {                // ldh [c], a
+        
+        /////////////////////////////////
+        //      $CB PREFIX INSTRS     //
+        ///////////////////////////////
+        
+        else if (match(cmd, "11001011")) {
+            print ("    detected: cb\n");
+
+            uint8_t cb_op = mem->get(rf.get(PC));
+            r8_index_t r8 = RegFile::get_r8(cb_op & 0b111);
+
+            if (match(cb_op, "00000xxx")) {         // rlc r8
+                print("    detected: rlc r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t msb = (val >> 7) & 1;
+                val = ((val << 1) | msb) & 0xFF;
+                rf.set(r8, val);
+            } else if (match(cb_op, "00001xxx")) {  // rrc r8
+                print("    detected: rrc r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t lsb = val & 1;
+                val = ((val >> 1) | (lsb << 7)) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = lsb;
+            } else if (match(cb_op, "00010xxx")) {  // rl r8
+                print("    detected: rl r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t msb = (val >> 7) & 1;
+                val = ((val << 1) | rf.regs[AF].flags.c) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = msb;
+            } else if (match(cb_op, "00011xxx")) {  // rr r8
+                print("    detected: rr r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t lsb = val & 1;
+                val = ((val >> 1) | (rf.regs[AF].flags.c << 7)) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = lsb;
+            } else if (match(cb_op, "00100xxx")) {  // sla r8
+                print("    detected: sla r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t msb = (val >> 7) & 1;
+                val = (val << 1) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = msb;
+            } else if (match(cb_op, "00101xxx")) {  // sra r8
+                print("    detected: sra r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t msb = val & 0x80;
+                uint8_t lsb = val & 1;
+                val = ((val >> 1) | msb) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = lsb;
+            } else if (match(cb_op, "00110xxx")) {  // swap r8
+                print("    detected: swap r8\n");
+                uint8_t val = rf.get(r8);
+                val = ((val & 0xF) << 4) | ((val & 0xF0) >> 4);
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = 0;
+            } else if (match(cb_op, "00111xxx")) {  // srl r8
+                print("    detected: srl r8\n");
+                uint8_t val = rf.get(r8);
+                uint8_t lsb = val & 1;
+                val = (val >> 1) & 0xFF;
+                rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = lsb;
+            } else if (match(cb_op, "01xxxxxx")) {  // bit b3, r8
+                int b3 = (cb_op >> 3) & 0b111;
+                print("    detected: bit %d, r8\n", b3);
+                uint8_t val = rf.get(r8);
+                rf.regs[AF].flags.z = ((val & (1 << b3)) == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 1;
+            } else if (match(cb_op, "10xxxxxx")) {  // res b3, r8
+                int b3 = (cb_op >> 3) & 0b111;
+                print("    detected: res %d, r8\n", b3);
+                uint8_t val = rf.get(r8);
+                val &= ~(1 << b3);
+                rf.set(r8, val);
+            } else if (match(cb_op, "11xxxxxx")) {  // set b3, r8
+                int b3 = (cb_op >> 3) & 0b111;
+                print("    detected: set %d, r8\n", b3);
+                uint8_t val = rf.get(r8);
+                val |= (1 << b3);
+                rf.set(r8, val);
+            } else {
+                printx("    default case in cb: 0x%02x\n", cb_op);
+            }
+            rf.regs[PC].val++;
+
+        } else if (match(cmd, "11100010")) {                // ldh [c], a
             print ("    detected: ldh [c], a\n");
 
             mem->set(0xff00 + rf.get(C), rf.get(A));
@@ -638,7 +765,7 @@ public:
         }
 
         else {
-            print ("    default case\n");
+            printx ("    default case. Opcode: 0x%0x\n", cmd);
         }
 
 
