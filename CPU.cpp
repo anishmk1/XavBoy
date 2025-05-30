@@ -230,7 +230,7 @@ public:
         } else if (match(cmd, "00xx0010")) {                // ld [r16mem], a
             print("    detected: ld dest[r16mem], a ----");
             r16mem_index_t reg_idx = RegFile::get_r16mem(((cmd >> 4) & 0b11));
-            mem->set(rf.get(reg_idx), rf.regs[AF].hi);
+            mem->set(rf.get(reg_idx, true), rf.regs[AF].hi);
 
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00xx1010")) {                // ld a, [r16mem]	
@@ -556,13 +556,13 @@ public:
         } else if (match(cmd, "11xx0001")) {                // pop r16stk
             print ("    detected: pop r16stk\n");
 
-            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0x11));
+            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0b11));
             pop_r16_stack(r16stk);
 
         } else if (match(cmd, "11xx0101")) {                // push r16stk
             print ("    detected: pop r16stk\n");
 
-            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0x11));
+            r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0b11));
             uint16_t val = rf.get(r16stk);
             push_val_stack(val);
         }
@@ -592,9 +592,6 @@ public:
         } else if (match(cmd, "11110000")) {                // ldh a, [imm8]
             print ("    detected: ldh a, [imm8]\n");
 
-            // FIXME: this is unclear in the docs. direct mem access of imm8 means addresses from 0x0000 to 0x00ff
-            // But valid mem addresses shoudl be between 0xff00 and 0xffff. So offsetting this imm8 similar to ldh a [c]
-            // Confirm this..
             uint8_t imm8 = mem->get(rf.get(PC));
             rf.regs[PC].val++;
             rf.set(A, mem->get(0xff00 + imm8));
@@ -603,9 +600,7 @@ public:
 
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
             rf.regs[PC].val += 2;
-            if (imm16 > 0xff00 && imm16 < 0xffff) {
-                rf.set(A, mem->get(imm16));
-            }
+            rf.set(A, mem->get(imm16));     // NOTE: this corresponds to LD A,[n16] of rgbds gb docs. There's no guard for addr (ff00 -> ffff) like in the ldh instrs
         } else if (match(cmd, "11101000")) {                // add sp, imm8
             print ("    detected: add sp, imm8\n");
 
@@ -703,6 +698,7 @@ private:
         if ((cmd >> 6) & 0b1) {
             operand = mem->get(rf.regs[PC].val);     // imm8
             imm_or_reg = true;
+            rf.regs[PC].val += 1;
         } else {
             int reg_bits = (cmd & 0b111);
             r8_index_t r8 = RegFile::get_r8(reg_bits);
@@ -710,7 +706,6 @@ private:
             imm_or_reg = false;
         }
 
-        rf.regs[PC].val += 1;
         return imm_or_reg;
     }
 
