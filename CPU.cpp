@@ -392,8 +392,9 @@ public:
                 print (" cc: 0x%0x; branch not taken\n", cc);
             }
         } else if (match(cmd, "00010000")) {                // stop
-            print("    detected: stop\n");
+            printx ("    detected: stop\n");
             rf.regs[PC].val++;         // stop is NOP but 2 cycles (FIXME: need to pair this with WAKE?)
+            std::exit(EXIT_SUCCESS);
         } 
 
         ///////////////////////
@@ -401,7 +402,8 @@ public:
         /////////////////////
         else if (match(cmd, "01xxxxxx")) {                  // ld r8, r8
             if (match(cmd, "01110110")) {
-                print("    detected: halt ---- FIXME UNIMPLEMENTED");
+                printx ("    detected: HALT");
+                std::exit(EXIT_SUCCESS);
             } else {
                 print("    detected: ld r8, r8 ----");
                 int regd_bits = ((cmd >> 3) & 0b111);
@@ -519,7 +521,8 @@ public:
             print ("    detected: reti\n");
 
             pop_r16_stack(PC);
-            IME_nxt = 1;    // Enable Interrupts next cycle
+            mem->mmio->set_ime();    // Enable Interrupts next cycle
+
         } else if (match(cmd, "110xx010")) {                // jp cond, imm16
             print ("    detected: jp cond, imm16\n");
             cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
@@ -757,31 +760,35 @@ public:
         } else if (match(cmd, "11110011")) {                // di
             print ("    detected: di\n");
 
-            IME = 0;
+            mem->mmio->clear_ime();
         } else if (match(cmd, "11111011")) {                // ei
             print ("    detected: ei\n");
 
-            IME_nxt = 1;
-        }
+            mem->mmio->set_ime();
+        } 
 
         else {
+            std::set<uint8_t> hardlock_ops = {
+                0xD3, 0xDB, 0xDD, 0xE3, 0xE4, 0xEB, 0xEC, 0xED, 0xF4, 0xFC, 0xFD
+            };
+            if (hardlock_ops.count(cmd)) {
+                std::cerr << "Detected Hard Lock Opcode: 0x" << std::hex << cmd << std::endl;
+                std::exit(EXIT_FAILURE);
+            }
+
             printx ("    default case. Opcode: 0x%0x\n", cmd);
         }
 
 
         if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
 
-        flopped_updates();
         serial_output();
+
+        check_and_handle_interrupts();
     }
 
 
 private:
-
-    bool IME = 0;   // Interrupt Master Enable - - - disabled at game start
-
-    bool IME_nxt = 0;   // used to set IME on the next to next cycle
-    bool IME_set = 0;   // used to set IME on the next cycle
 
     // Implement wildcard matching - cmd=1010 matches compare="10xx"
     bool match(uint8_t cmd, const char *compare) {
@@ -808,16 +815,6 @@ private:
         if (!ex.no_n) rf.regs[AF].flags.n = 1;
         if (!ex.no_h) rf.regs[AF].flags.h = ((b & 0xF) > (a & 0xF));              // borrow from bit 4?
         if (!ex.no_c) rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
-    }
-
-    void flopped_updates() {
-        if (IME_nxt) {
-            IME_set = 1;
-            IME_nxt = 0;
-        } else if (IME_set) {
-            IME = 1;
-            IME_set = 0;
-        }
     }
 
     bool get_block2_3_operand(uint8_t cmd, uint8_t &operand) {
@@ -874,6 +871,15 @@ private:
         mem->set(rf.get(SP), (val >> 8) & 0xff);
         rf.set(SP, rf.get(SP) - 1);   // decrement SP
         mem->set(rf.get(SP), val & 0xff);
+    }
+
+    void check_and_handle_interrupts() {
+        uint16_t intr_handler_addr;
+
+        if (mem->mmio->check_interrupts(intr_handler_addr)) {
+            push_val_stack(rf.regs[PC].val);
+            rf.regs[PC].val = intr_handler_addr; 
+        }
     }
     
     //    blarggs test - serial output

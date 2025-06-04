@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring> // For strcmp
 #include <cassert>
+#include <set>
 
 #define printx(...)                            \
     do {                                       \
@@ -41,6 +42,7 @@ const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from ad
 const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
+#include "Peripherals.cpp"
 #include "Memory.cpp"
 #include "CPU.cpp"
 
@@ -98,7 +100,8 @@ int main(int argc, char* argv[]) {
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
-    Memory *mem = new Memory();
+    MMIO *mmio = new MMIO();
+    Memory *mem = new Memory(mmio);
     CPU *cpu = new CPU(mem);
     Reg (&regs)[NUM_REGS] = cpu->rf.regs;
 
@@ -118,11 +121,14 @@ int main(int argc, char* argv[]) {
     }
 
     // main loop
-    size_t num_bytes = 0;
-    while (num_bytes++ < file_size) {
+    int free_clk = 0;
+    // size_t num_bytes = 0;
+    // while (num_bytes++ < file_size) {
+    while (true) {
         // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
         print ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
 
+        mmio->incr_timers(++free_clk);
         cpu->execute();
     }
 }

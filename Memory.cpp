@@ -12,12 +12,12 @@ class Memory {
 
     size_t romSize;
     std::vector<uint8_t> mem;
-    // std::vector<uint8_t> mem = std::vector<uint8_t>(MEMORY_SIZE, 0);
 
 public:
+    MMIO *mmio;
 
-
-    Memory () {
+    Memory (MMIO *mmio) {
+        this->mmio = mmio;
         // init all mem locations to 0
         mem = std::vector<uint8_t>(MEMORY_SIZE, 0);
 
@@ -83,12 +83,18 @@ public:
         if (addr < 0 || addr >= MEMORY_SIZE) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return 1;
+        } else if (addr <= 0x7fff) {
+            std::cerr << "Attempted write-access to ROM addr: 0x%0x" << std::hex << addr << std::endl;
+            return 1;
+        } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
+            addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
         }
 
-        // if (addr == (0xff44)) {
+        if (mmio->write(addr, val)) {
+            return 0;
+        }
 
-        // }        
-
+        // Valid Memory Write access
         mem[addr] = val;
         return 0;
     }
@@ -97,13 +103,16 @@ public:
         if (addr < 0 || addr >= MEMORY_SIZE) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return -1;
+        } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
+            addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
+        } else {
+            // TEMOPRARY OVERRIDES/HARDCODED VALUES
+            if (addr == (0xff44)) {
+                return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
+            }
         }
 
-        // TEMOPRARY OVERRIDES/HARDCODED VALUES
-        if (addr == (0xff44)) {
-            return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
-        }
-
+        // Valid Memory Read Access
         return mem[addr];
     }
 
@@ -112,7 +121,7 @@ public:
         print ("Loading ROM into Memory Address 0x%0x....\n", rom_start_addr);
         print ("   file_size: %lu\n", file_size);
         for (size_t i = 0; i < file_size; i++) {
-            set(i + rom_start_addr, rom_ptr[i]); 
+            mem[i + rom_start_addr] = rom_ptr[i];
         }
         romSize = file_size;
         print ("Successfully loaded ROM!\n\n");
