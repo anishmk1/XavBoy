@@ -21,6 +21,12 @@
     } while (0)
 
 
+#define printv(...)                                 \
+    do {                                            \
+        if (verbose == 1)    \
+            printf(__VA_ARGS__);                    \
+    } while (0)
+
 #define print(...)                             \
     do {                                       \
         if (disable_prints == 0)               \
@@ -28,16 +34,11 @@
     } while (0)
 
 
-#define printv(...)                                 \
-    do {                                            \
-        if (disable_prints == 0 && verbose == 1)    \
-            printf(__VA_ARGS__);                    \
-    } while (0)
-
-
 std::ofstream logFile;
-bool verbose = false;
+bool verbose = true;
 bool disable_prints = true;
+bool DEBUGGER = false;
+bool PRINT_REGS_EN = true;
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
@@ -84,6 +85,48 @@ void setup_serial_output() {
     std::clog << "Serial Output Window....\n\n";
 }
 
+void debugger_break(long &num_steps_left, RegFile &rf) {
+    bool exit_debugger = false;
+    if (num_steps_left == 0) {
+        // Break CPU execution for debugging
+        do  {
+            PRINT_REGS_EN = true;
+            printx (">> ");
+            std::string dbg_cmd;
+            std::cin >> dbg_cmd;
+
+            if (dbg_cmd[0] == 'h') {    // help
+                printx ("Debug commands: 'sx'(step); 'r'(run); 'p'(print regs); 'mxxxx'(Read mem addr)\n");
+            } else if (std::tolower(dbg_cmd[0]) == 's') {
+                if (std::islower(dbg_cmd[0])) PRINT_REGS_EN = false; // Step quietly (dont print regs with each step)
+                
+                if (dbg_cmd.size() > 1) {
+                    int step_input = std::stoi(dbg_cmd.substr(1));
+                    num_steps_left = (step_input == 0) ? 0 : (step_input - 1);
+                }
+                exit_debugger = true;
+                // PRINT_REGS_EN
+            
+            } else if (dbg_cmd[0] == 'p') {
+                rf.print_regs();
+            } else if (dbg_cmd[0] == 'm') {
+
+            } else if (dbg_cmd[0] == 'd') {
+                if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", rf.debug0);
+                else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", rf.debug1);
+                else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", rf.debug2);
+            } else if (dbg_cmd[0] == 'r') {
+                DEBUGGER = false;   // disable debugger for rest of the run
+                exit_debugger = true;
+            }
+            
+        } while (exit_debugger == false);
+
+    } else {
+        num_steps_left--;
+    }
+}
+
 // emulate the cpu for the gameboy
 int main(int argc, char* argv[]) {
     // char* gb_file = "test-roms/prog_OR.gb";
@@ -103,7 +146,6 @@ int main(int argc, char* argv[]) {
     MMIO *mmio = new MMIO();
     Memory *mem = new Memory(mmio);
     CPU *cpu = new CPU(mem);
-    Reg (&regs)[NUM_REGS] = cpu->rf.regs;
 
 
     size_t file_size;
@@ -124,11 +166,12 @@ int main(int argc, char* argv[]) {
     int free_clk = 0;
     // size_t num_bytes = 0;
     // while (num_bytes++ < file_size) {
+    long num_steps_left = 0;
     while (true) {
-        // printf ("byte[%d]: 0x%0x\n", i, rom_ptr[i]);
-        print ("PC=0x%0x: cmd=0x%0x\n", regs[PC].val, static_cast<int>(mem->get(regs[PC].val)));
+        if (DEBUGGER) debugger_break(num_steps_left, cpu->rf);
 
         mmio->incr_timers(++free_clk);
         cpu->execute();
+
     }
 }

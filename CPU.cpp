@@ -36,6 +36,11 @@ public:
     Reg regs[NUM_REGS];
     Memory *mem;        // for [hl]
 
+    // FIXME: move this somewhere that makes sense
+    uint16_t debug0;
+    uint16_t debug1;
+    uint16_t debug2;
+
     uint16_t get(r16_index_t r16) {
         return regs[r16].val;
     }
@@ -157,8 +162,9 @@ public:
     }
 
     void print_regs() {
+        if (PRINT_REGS_EN == 0) return;
         if (GAMEBOY_DOCTOR) {
-            printx ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%02X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+            printv ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%02X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
                     get(A), get(F), get(B), get(C), get(D), get(E), get(H), get(L), get(SP), get(PC),
                     mem->get(get(PC)), mem->get(get(PC)+1), mem->get(get(PC)+2), mem->get(get(PC)+3));
         } else {
@@ -174,6 +180,8 @@ public:
 
     Memory *mem;
     RegFile rf;
+
+
 
     // Default constructor
     CPU (Memory *mem) {
@@ -206,7 +214,14 @@ public:
         // uint16_t *reg_ptr;
         uint8_t cmd = mem->get(rf.regs[PC].val);
 
-        if (GAMEBOY_DOCTOR) rf.print_regs();
+        if (GAMEBOY_DOCTOR) {
+            rf.print_regs();
+        }
+        // check for infinite loop
+        if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
+            print ("Detected Infinite loop. Exiting sim\n");
+            std::exit(EXIT_SUCCESS);
+        }
 
         // increment PC
         rf.regs[PC].val++;
@@ -259,7 +274,11 @@ public:
             rf.regs[reg_idx].val--;
         } else if (match(cmd, "00xx1001")) {                // add hl, r16
             print("    detected: add hl, r16\n");
-            int reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
+            r16_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.h = add16_overflowFromBitX(11, rf.get(HL), rf.get(reg_idx));
+            rf.regs[AF].flags.c = add16_overflowFromBitX(15, rf.get(HL), rf.get(reg_idx));
+
             rf.regs[HL].val += rf.regs[reg_idx].val;
 
         } else if (match(cmd, "00xxx100")) {                // inc r8
@@ -435,7 +454,11 @@ public:
             uint8_t val = rf.get(A) + rf.regs[AF].flags.c + operand;
             print (" A += carry(%0d) + (0x%0x)\n", rf.regs[AF].flags.c, operand);
 
-            compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, operand);
+            // compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, operand);
+            rf.regs[AF].flags.n = 0;
+            rf.regs[AF].flags.z = (val == 0);
+            rf.regs[AF].flags.h = add16_overflowFromBitX(3, rf.get(A), rf.regs[AF].flags.c, operand);
+            rf.regs[AF].flags.c = add16_overflowFromBitX(7, rf.get(A), rf.regs[AF].flags.c, operand);
             rf.set(A, val);
             // rf.regs[AF].hi += (rf.regs[AF].flags.c + operand);
         } else if (match(cmd, "10010xxx") || match(cmd, "11010110")) {                // sub a, r8          sub a, imm8
@@ -451,9 +474,12 @@ public:
             if (get_block2_3_operand(cmd, operand)) print ("    detected: sbc a, imm8 ---");
             else print ("    detected: sbc a, r8 ---");
 
-            print (" A -= (0x%0x + carry(%0d))\n", operand, rf.regs[AF].flags.c);
-            compute_flags_sub8(rf.get(A), (operand + rf.regs[AF].flags.c));
-            rf.regs[AF].hi -= (operand + rf.regs[AF].flags.c);
+            int carry = rf.regs[AF].flags.c;
+            rf.regs[AF].flags.n = 1;
+            rf.regs[AF].flags.z = (static_cast<uint8_t>(rf.get(A) - operand) - carry == 0);
+            rf.regs[AF].flags.h = sub_borrowFromBitX(4, rf.get(A), operand, carry);
+            rf.regs[AF].flags.c = ((operand + carry) > rf.get(A));
+            rf.regs[AF].hi -= (operand + carry);
         } else if (match(cmd, "10100xxx") || match(cmd, "11100110")) {                // and a, r8          and a, imm8 
             uint8_t operand;
             if (get_block2_3_operand(cmd, operand)) print ("    detected: and a, imm8 ---");
@@ -803,6 +829,44 @@ private:
         return true;
     }
 
+    bool add16_overflowFromBitX(int bit, uint16_t a=0, uint16_t b=0, uint16_t c=0) {
+        if (bit > 15) {
+            printx ("Invalid bit provided to add16_overflow\n");
+            std::exit(EXIT_FAILURE);
+        }
+
+        // Mask out bits other than X to 0.
+        a &= ((1 << (bit+1)) - 1);
+        b &= ((1 << (bit+1)) - 1);
+        c &= ((1 << (bit+1)) - 1);
+
+        // Add result --> if bit X+1 got set that means it carried through bit X
+        int result = a + b + c;
+        if ((result >> (bit+1)) & 0x1) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    bool sub_borrowFromBitX(int bit,  uint16_t A=0, uint16_t b=0, uint16_t c=0) {
+        if (bit < 0 || bit > 15) {
+            printx ("Invalid bit=%d provided to sub_borrowFromBitX\n", bit);
+            std::exit(EXIT_FAILURE);
+        }
+
+        uint16_t mask = ((1 << bit) - 1);
+
+        // Mask out bits other than X-1 to 0
+        if ((A & mask) < (b & mask)) return true;
+
+        A = A - b;
+
+        if ((A & mask) < (c & mask)) return true;
+
+        return false;
+    }
+
     void compute_flags_add8(int a, int b, ExcludeFlags ex = ExcludeFlags()) {
         if (!ex.no_z) rf.regs[AF].flags.z = ((((a & 0xFF) + (b & 0xFF)) & 0xFF) == 0);
         if (!ex.no_n) rf.regs[AF].flags.n = 0;
@@ -885,9 +949,9 @@ private:
     //    blarggs test - serial output
     void serial_output() {
         if (mem->get(0xff02) == 0x81) {
-            char c = '0' + mem->get(0xff01);
-            // print("%c", c);
+            char c = static_cast<char>(mem->get(0xff01));
             std::clog << c;
+            // printx ("%c", c);
             // memory[0xff02] = 0x0;
             mem->set(0xff02, 1);
         }    
