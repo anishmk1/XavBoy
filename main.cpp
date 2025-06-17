@@ -135,7 +135,8 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     if (argc == 2) {
-        verbose = (strcmp(argv[1], "--debug") == 0);
+        DEBUGGER = (strcmp(argv[1], "--debug") == 0);
+        PRINT_REGS_EN = (strcmp(argv[1], "--quiet") != 0);
         // gb_file = argv[1];
     }
 
@@ -148,9 +149,24 @@ int main(int argc, char* argv[]) {
     CPU *cpu = new CPU(mem);
 
 
+// 1000 0000
+// 0111 1111
+// 1000 0000
+
+    /**
+     * INC H                        // 0x24
+     * LD mem[0xff00 + 0x80], A=88  // 0xE0/0x80
+     * LD A, mem[0xff00 + 0x82]     // 0xF0/0x82
+     * XOR A, A, (HL)               // 0xAE
+     * INC H                        // 0x24
+     */
+
+
     size_t file_size;
     uint8_t *rom_ptr;
-    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
+    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
+    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
+    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/test.gb", &file_size);
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;

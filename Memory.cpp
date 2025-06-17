@@ -84,7 +84,7 @@ public:
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return 1;
         } else if (addr <= 0x7fff) {
-            std::cerr << "Attempted write-access to ROM addr: 0x%0x" << std::hex << addr << std::endl;
+            // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
             return 1;
         } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
             addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF

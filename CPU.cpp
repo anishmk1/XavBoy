@@ -430,7 +430,6 @@ public:
                 r8_index_t reg_d = RegFile::get_r8(regd_bits); //RegFile::get_r16(regd_bits, USE_R8_INDEX);
                 r8_index_t reg_s = RegFile::get_r8(regs_bits); //RegFile::get_r16(regs_bits, USE_R8_INDEX);
                 rf.set(reg_d, rf.get(reg_s));
-                print(" r[%s] <= r[%s](0x%0x)\n", RegFile::get_reg_name(reg_d), RegFile::get_reg_name(reg_s), rf.get(reg_d));
             }
         }
         
@@ -452,7 +451,6 @@ public:
             else print ("    detected: adc a, r8 ---");
 
             uint8_t val = rf.get(A) + rf.regs[AF].flags.c + operand;
-            print (" A += carry(%0d) + (0x%0x)\n", rf.regs[AF].flags.c, operand);
 
             // compute_flags_add8(rf.get(A) + rf.regs[AF].flags.c, operand);
             rf.regs[AF].flags.n = 0;
@@ -619,7 +617,7 @@ public:
         //      $CB PREFIX INSTRS     //
         ///////////////////////////////
         
-        else if (match(cmd, "11001011")) {
+        else if (match(cmd, "11001011")) {                  // $CB
             print ("    detected: cb\n");
 
             uint8_t cb_op = mem->get(rf.get(PC));
@@ -631,6 +629,10 @@ public:
                 uint8_t msb = (val >> 7) & 1;
                 val = ((val << 1) | msb) & 0xFF;
                 rf.set(r8, val);
+                rf.regs[AF].flags.z = (val == 0);
+                rf.regs[AF].flags.n = 0;
+                rf.regs[AF].flags.h = 0;
+                rf.regs[AF].flags.c = msb;
             } else if (match(cb_op, "00001xxx")) {  // rrc r8
                 print("    detected: rrc r8\n");
                 uint8_t val = rf.get(r8);

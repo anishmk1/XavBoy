@@ -16,8 +16,11 @@ main.out: $(SRC)
 run: main.out
 	./main.out
 
-debug: main.out
+debug: clean main.out
 	./main.out --debug
+
+quiet: clean main.out
+	./main.out --quiet
 
 clean:
 	@rm -f main.out
