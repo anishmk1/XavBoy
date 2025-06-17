@@ -164,7 +164,8 @@ int main(int argc, char* argv[]) {
 
     size_t file_size;
     uint8_t *rom_ptr;
-    rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
+    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb", &file_size);
+    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/test.gb", &file_size);

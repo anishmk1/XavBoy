@@ -366,7 +366,8 @@ public:
                 }
                 rf.regs[AF].hi += adj;
             }
-            if (rf.regs[AF].hi == 0) rf.regs[AF].flags.z = 1;
+            // if (rf.regs[AF].hi == 0) rf.regs[AF].flags.z = 1;
+            rf.regs[AF].flags.z = (rf.get(A) == 0);
             rf.regs[AF].flags.h = 0;
             // FIXME: c flag idk what to do
         } else if (match(cmd, "00101111")) {                // cpl
