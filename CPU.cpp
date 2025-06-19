@@ -526,7 +526,7 @@ public:
         } else if (match(cmd, "10111xxx") || match(cmd, "11111110")) {                // cp a, r8           cp a, imm8
             uint8_t operand;
             if (get_block2_3_operand(cmd, operand)) print ("    detected: cp a, imm8 ---");
-            else print ("    detected: cp a, r8 ---");
+            else print ("    detected: cp a, r8 ---\n");
 
             compute_flags_sub8(rf.get(A), operand);
         } 
@@ -615,11 +615,13 @@ public:
             pop_r16_stack(r16stk);
 
         } else if (match(cmd, "11xx0101")) {                // push r16stk
-            print ("    detected: pop r16stk\n");
+            print ("    detected: push r16stk ---");
 
             r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0b11));
             uint16_t val = rf.get(r16stk);
             push_val_stack(val);
+
+            print (" r16stk=%0d; val=0x%0x; SP=0x%0x\n", r16stk, val, rf.get(SP));
         } 
         
 
@@ -817,6 +819,9 @@ public:
 
             printx ("    default case. Opcode: 0x%0x\n", cmd);
         }
+
+        // Zero out lower nibble of Flags reg
+        rf.regs[AF].lo &= 0b11110000;
 
 
         if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
