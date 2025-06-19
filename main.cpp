@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
     
     //  1 - PASSED
     //  2 - hanging...
-    //  3 - hanging...
+    //  3 - PASSED
     //  4 - PASSED
     //  5 - PASSED
     //  6 - PASSED
@@ -190,13 +190,13 @@ int main(int argc, char* argv[]) {
     size_t file_size;
     uint8_t *rom_ptr;
     // ------------------------------- BLARGG'S TEST ROMS -------------------------------------------
-    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/05-op rp.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/06-ld r,r.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
+    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/08-misc instrs.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/10-bit ops.gb", &file_size);

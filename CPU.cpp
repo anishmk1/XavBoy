@@ -170,7 +170,7 @@ public:
     void print_regs() {
         if (PRINT_REGS_EN == 0) return;
         if (GAMEBOY_DOCTOR) {
-            printv ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%02X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+            printv ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
                     get(A), get(F), get(B), get(C), get(D), get(E), get(H), get(L), get(SP), get(PC),
                     mem->get(get(PC)), mem->get(get(PC)+1), mem->get(get(PC)+2), mem->get(get(PC)+3));
         } else {
@@ -266,8 +266,9 @@ public:
             print("    detected ld [imm16], sp\n");
             // next 2 bytes are the immediate
             uint16_t imm16 = (mem->get(rf.regs[PC].val+1) << 8) + mem->get(rf.regs[PC].val);
-            rf.regs[SP].val = imm16;
             rf.regs[PC].val += 2;
+            mem->set(imm16, rf.regs[SP].lo);
+            mem->set(imm16+1, rf.regs[SP].hi);
 
         } else if (match(cmd, "00xx0011")) {                // inc r16
             print("    detected: inc r16\n");
