@@ -83,9 +83,15 @@ public:
     }
 
     bool check_cc(cc_t cc) {
-        if (cc == nz) return (regs[AF].flags.z != 1);
+        if (cc == nz) return (regs[AF].flags.z == 0);
         else if (cc == z) return (regs[AF].flags.z == 1);
-        else if (cc == nc) return (regs[AF].flags.c != 1);
+        else if (cc == nc) {
+            print ("    regs[AF].flags.c = %0d\n", regs[AF].flags.c);
+            // print ("    regs[AF].flags = 0x%0x\n", regs[AF].flags);
+            print ("    regs[AF].lo = 0x%0x\n", regs[AF].lo);
+            print ("    regs[AF].val[4] = %0d\n", ((regs[AF].val >> 4) & 0x1));
+            return (regs[AF].flags.c == 0);
+        }
         else if (cc == c) return (regs[AF].flags.c == 1);
         print ("   Unexpected index to check_cc: %d\n", cc);
         exit(1);
@@ -405,6 +411,8 @@ public:
             int8_t imm8 = mem->get(rf.regs[PC].val);
             rf.regs[PC].val++;      // JR instr is 2 bytes long. So PC is incremented once regardless of branch taken/not to cover reading the imm8. Then the actual jump is done
 
+            // if ((cc != nc && rf.check_cc(cc)) ||
+            //     (cc == nc && (((rf.regs[AF].lo >> 4) & 0x1) == 0))) {
             if (rf.check_cc(cc)) {
                 rf.regs[PC].val += imm8;
                 print (" cc: 0x%0x; branch taken: PC <= 0x%0x\n", cc, imm8);
@@ -555,6 +563,8 @@ public:
             if (rf.check_cc(cc)) {
                 uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
                 rf.set(PC, imm16);
+            } else {
+                rf.regs[PC].val += 2;
             }
         } else if (match(cmd, "11000011")) {                // jp imm16
             print ("    detected: jp cond, imm16\n");

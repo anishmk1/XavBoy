@@ -94,6 +94,14 @@ public:
             return 0;
         }
 
+
+        // if (addr == 0x4244) {
+        //     print ("mem[0x4244] <= 0x%0x\n", mem[addr]);
+        // }
+        // if (val == 0xB1) {
+        //     printx ("mem[0x%0x] <= 0xB1\n", addr);
+        // }
+
         // Valid Memory Write access
         mem[addr] = val;
         return 0;
@@ -122,6 +130,9 @@ public:
         print ("   file_size: %lu\n", file_size);
         for (size_t i = 0; i < file_size; i++) {
             mem[i + rom_start_addr] = rom_ptr[i];
+            // if (i + rom_start_addr == 0x4244) {
+            //     printx ("mem[0x%0x] <= 0x%0x\n", i + rom_start_addr, mem[i + rom_start_addr]);
+            // }
         }
         romSize = file_size;
         print ("Successfully loaded ROM!\n\n");

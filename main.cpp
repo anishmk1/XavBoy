@@ -85,7 +85,7 @@ void setup_serial_output() {
     std::clog << "Serial Output Window....\n\n";
 }
 
-void debugger_break(long &num_steps_left, RegFile &rf) {
+void debugger_break(long &num_steps_left, CPU &cpu) {
     bool exit_debugger = false;
     if (num_steps_left == 0) {
         // Break CPU execution for debugging
@@ -98,6 +98,7 @@ void debugger_break(long &num_steps_left, RegFile &rf) {
             if (dbg_cmd[0] == 'h') {    // help
                 printx ("Debug commands: 'sx'(step); 'r'(run); 'p'(print regs); 'mxxxx'(Read mem addr)\n");
             } else if (std::tolower(dbg_cmd[0]) == 's') {
+                // prints state of regs and PC THAT WERE EXECUTED
                 if (std::islower(dbg_cmd[0])) PRINT_REGS_EN = false; // Step quietly (dont print regs with each step)
                 
                 if (dbg_cmd.size() > 1) {
@@ -107,14 +108,24 @@ void debugger_break(long &num_steps_left, RegFile &rf) {
                 exit_debugger = true;
                 // PRINT_REGS_EN
             
+            } else if (dbg_cmd[0] == 'e') {
+                disable_prints = !disable_prints; // enable prints
+                printx ("disable_prints <= %0d\n", disable_prints);
             } else if (dbg_cmd[0] == 'p') {
-                rf.print_regs();
+                // prints state of regs and pc ABOUT TO BE EXECUTED
+                cpu.rf.print_regs();
             } else if (dbg_cmd[0] == 'm') {
-
+                if (dbg_cmd.size() == 5) {
+                    int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);
+                    uint16_t val = cpu.mem->get(addr);
+                    printx ("mem[0x%0x] = 0x%0x\n", addr, val);
+                } else {
+                    printx ("Please provide a 4 digit hex address with m: mxxxx\n");
+                }
             } else if (dbg_cmd[0] == 'd') {
-                if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", rf.debug0);
-                else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", rf.debug1);
-                else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", rf.debug2);
+                if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", cpu.rf.debug0);
+                else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", cpu.rf.debug1);
+                else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", cpu.rf.debug2);
             } else if (dbg_cmd[0] == 'r') {
                 DEBUGGER = false;   // disable debugger for rest of the run
                 exit_debugger = true;
@@ -149,26 +160,52 @@ int main(int argc, char* argv[]) {
     CPU *cpu = new CPU(mem);
 
 
-// 1000 0000
-// 0111 1111
-// 1000 0000
-
     /**
      * INC H                        // 0x24
      * LD mem[0xff00 + 0x80], A=88  // 0xE0/0x80
      * LD A, mem[0xff00 + 0x82]     // 0xF0/0x82
      * XOR A, A, (HL)               // 0xAE
      * INC H                        // 0x24
+     * 
+     * 
+     *  $DEF8 is the base address for all instrs being tested 
+     * 
      */
+
+     
+    
+    //  1 - hanging...
+    //  2 - hanging...
+    //  3 - hanging...
+    //  4 - PASSED
+    //  5 - PASSED
+    //  6 - PASSED
+    //  7 - detected HALT
+    //  8 - hanging...
+    //  9 - PASSED
+    // 10 - PASSED
+    // 11 - PASSED
 
 
     size_t file_size;
     uint8_t *rom_ptr;
-    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb", &file_size);
+    // ------------------------------- BLARGG'S TEST ROMS -------------------------------------------
+    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/05-op rp.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/06-ld r,r.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/08-misc instrs.gb", &file_size);
     // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
-    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
-    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/10-bit ops.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb", &file_size);
     // rom_ptr = open_rom("./test-roms/test.gb", &file_size);
+
+    // ----------------------------------- DEBUG ROMS -----------------------------------------------
+    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb", &file_size);
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
@@ -185,7 +222,8 @@ int main(int argc, char* argv[]) {
     // while (num_bytes++ < file_size) {
     long num_steps_left = 0;
     while (true) {
-        if (DEBUGGER) debugger_break(num_steps_left, cpu->rf);
+    // while (free_clk < 2335) {
+        if (DEBUGGER) debugger_break(num_steps_left, *cpu);
 
         mmio->incr_timers(++free_clk);
         cpu->execute();
