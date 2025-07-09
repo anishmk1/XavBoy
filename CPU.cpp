@@ -421,7 +421,7 @@ public:
                 print (" cc: 0x%0x; branch not taken\n", cc);
             }
         } else if (match(cmd, "00010000")) {                // stop
-            printx ("    detected: stop\n");
+            print ("    detected: stop\n");
             rf.regs[PC].val++;         // stop is NOP but 2 cycles (FIXME: need to pair this with WAKE?)
             std::exit(EXIT_SUCCESS);
         } 
@@ -604,10 +604,10 @@ public:
         } else if (match(cmd, "11xxx111")) {                // rst tgt3
             print ("    detected: rst tgt3\n");
 
-            uint16_t target_addr = (((cmd >> 3) & 0x111) << 3);     // tgt3 encodes the target address divided by 8.
-            uint16_t return_addr = (mem->get(rf.get(PC) + 3) << 8) + (mem->get(rf.get(PC) + 2));    // little endian retn addr
-
+            uint16_t target_addr = (((cmd >> 3) & 0b111) << 3);     // tgt3 encodes the target address divided by 8.
+            uint16_t return_addr = rf.get(PC);
             push_val_stack(return_addr);
+
             rf.set(PC, target_addr);
         } else if (match(cmd, "11xx0001")) {                // pop r16stk
             print ("    detected: pop r16stk\n");
@@ -930,8 +930,8 @@ private:
     /**
      * Higher addresses
         0xffff  | ff
-        0xfffe  | cd
-        0xfffd  | ab  <---- SP (retn addr abcd)
+        0xfffe  | ab
+        0xfffd  | cd  <---- SP (retn addr abcd)
         0xfffc  | ff
         .
         .
@@ -941,19 +941,10 @@ private:
      */
 
     void push_val_stack(uint16_t val) {
-
-        // Write retn addr to stack then update stack pointer (grows from high addr to low addr)
-        // 1. Write lower byte of retn addr to SP - 1
-        // mem->set(rf.get(SP) - 1, (val & 0xff));
-        // // 2. Write higher byte of retn addr to SP - 2
-        // mem->set(rf.get(SP) - 1, ((val >> 8) & 0xff));
-        // // 3. Set SP = SP - 2;
-        // rf.set(SP, rf.get(SP) - 2);
-
         rf.set(SP, rf.get(SP) - 1);   // decrement SP
-        mem->set(rf.get(SP), (val >> 8) & 0xff);
+        mem->set(rf.get(SP), (val >> 8) & 0xff);    // Write higher-order byte of val
         rf.set(SP, rf.get(SP) - 1);   // decrement SP
-        mem->set(rf.get(SP), val & 0xff);
+        mem->set(rf.get(SP), val & 0xff);           // Write lower-order byte of val
     }
 
     void check_and_handle_interrupts() {

@@ -85,9 +85,17 @@ void setup_serial_output() {
     std::clog << "Serial Output Window....\n\n";
 }
 
-void debugger_break(long &num_steps_left, CPU &cpu) {
+void debugger_break(long &num_steps_left, uint8_t &tgt_instr, CPU &cpu) {
     bool exit_debugger = false;
-    if (num_steps_left == 0) {
+    bool found_instr = true;
+    if (tgt_instr != 0xd3) {
+        found_instr = (cpu.mem->get(cpu.rf.get(PC)) == tgt_instr);
+    }
+
+    if (num_steps_left == 0 && found_instr) {
+        if (tgt_instr != 0xd3) {
+            tgt_instr = 0xd3;
+        }
         // Break CPU execution for debugging
         do  {
             PRINT_REGS_EN = true;
@@ -102,8 +110,13 @@ void debugger_break(long &num_steps_left, CPU &cpu) {
                 if (std::islower(dbg_cmd[0])) PRINT_REGS_EN = false; // Step quietly (dont print regs with each step)
                 
                 if (dbg_cmd.size() > 1) {
-                    int step_input = std::stoi(dbg_cmd.substr(1));
-                    num_steps_left = (step_input == 0) ? 0 : (step_input - 1);
+                    if (dbg_cmd[1] == 'i') {
+                        // step to instruction:
+                        tgt_instr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
+                    } else {
+                        int step_input = std::stoi(dbg_cmd.substr(1));
+                        num_steps_left = (step_input == 0) ? 0 : (step_input - 1);
+                    }
                 }
                 exit_debugger = true;
                 // PRINT_REGS_EN
@@ -134,7 +147,7 @@ void debugger_break(long &num_steps_left, CPU &cpu) {
         } while (exit_debugger == false);
 
     } else {
-        num_steps_left--;
+        if (found_instr == true) num_steps_left--;
     }
 }
 
@@ -180,7 +193,7 @@ int main(int argc, char* argv[]) {
     //  4 - PASSED
     //  5 - PASSED
     //  6 - PASSED
-    //  7 - detected HALT
+    //  7 - PASSED
     //  8 - hanging...
     //  9 - PASSED
     // 10 - PASSED
@@ -221,9 +234,10 @@ int main(int argc, char* argv[]) {
     // size_t num_bytes = 0;
     // while (num_bytes++ < file_size) {
     long num_steps_left = 0;
+    uint8_t tgt_instr = 0xd3;
     while (true) {
     // while (free_clk < 2335) {
-        if (DEBUGGER) debugger_break(num_steps_left, *cpu);
+        if (DEBUGGER) debugger_break(num_steps_left, tgt_instr, *cpu);
 
         mmio->incr_timers(++free_clk);
         cpu->execute();

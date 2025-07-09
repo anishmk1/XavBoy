@@ -1,6 +1,6 @@
 Serial Output Window....
 
-01-special
+07-jr,jp,call,ret,rst
 
 
 Passed
