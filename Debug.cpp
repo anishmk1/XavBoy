@@ -1,0 +1,120 @@
+#include <iostream>
+#include <cstdio>
+
+#include "main.h"
+#include "CPU.h"
+#include "Debug.h"
+#include "Memory.h"
+
+
+Debug::Debug() {
+    free_clk = 0;
+    num_steps_left = 0;
+    run = false;
+    tgt_instr = 0xd3;
+}
+
+
+// Move this to a separate file so I can keep track of all the global vars easier
+// Can also use the vars to interract with the program automatically
+// num_steps_left, breakpoint, run, clk_cnt, tg_instr etc etc
+void Debug::debugger_break(CPU &cpu) {
+    bool exit_debugger = false;
+    bool break_execution = true;
+    // If run, dont break execution (priority = 4)
+    if (run) {
+        break_execution = false;
+    }
+    // If requested step count is reached, break execution (priority = 3)
+    if (num_steps_left > 0) {
+        break_execution = false;
+        num_steps_left--;
+    }
+    // If requested instruction is found, break execution (priority = 2)
+    if (tgt_instr != 0xd3) {
+        if (cpu.mem->get(cpu.rf.get(PC)) == tgt_instr) {
+            break_execution = true;
+            tgt_instr = 0xd3;
+        } else {
+            break_execution = false;
+        }
+    }
+    // If breakpoint is triggered in code, break execution (priority = 1)
+    if (breakpoint) {
+        break_execution = true;
+        breakpoint = false;
+        num_steps_left = 0;
+        tgt_instr = 0xd3;
+    }
+
+    // Break CPU execution for debugging
+    if (break_execution) {
+        do  {
+            PRINT_REGS_EN = true;
+            printx (">> ");
+            std::string dbg_cmd;
+            std::cin >> dbg_cmd;
+
+            if (dbg_cmd[0] == 'h') {    // help
+                printx ("Debug commands: 'sx'(step); 'r'(run); 'p'(print regs); 'mxxxx'(Read mem addr)\n");
+            } else if (std::tolower(dbg_cmd[0]) == 's') {
+                // prints state of regs and PC THAT WERE EXECUTED
+                if (std::islower(dbg_cmd[0])) PRINT_REGS_EN = false; // Step quietly (dont print regs with each step)
+                
+                if (dbg_cmd.size() > 1) {
+                    if (dbg_cmd[1] == 'i') {
+                        // step to instruction:
+                        tgt_instr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
+                    } else {
+                        int step_input = std::stoi(dbg_cmd.substr(1));
+                        num_steps_left = (step_input == 0) ? 0 : (step_input - 1);
+                    }
+                }
+                exit_debugger = true;
+            
+            } else if (dbg_cmd[0] == 'e') {
+                disable_prints = !disable_prints; // enable prints
+                printx ("disable_prints <= %0d\n", disable_prints);
+            } else if (dbg_cmd[0] == 'p') {
+                // prints state of regs and pc ABOUT TO BE EXECUTED
+                cpu.rf.print_regs();
+            } else if (dbg_cmd[0] == 'm') {
+                if (dbg_cmd.size() == 5) {
+                    int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);
+                    uint16_t val = cpu.mem->get(addr);
+                    printx ("mem[0x%0x] = 0x%0x\n", addr, val);
+                } else if (dbg_cmd[1] == 'd' && dbg_cmd.size() == 6) {
+                    // Memory Dump
+                    int addr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
+                    for (int i = (addr-20); i < (addr+20); i++) {
+                        printx ("mem[0x%0x]=0x%0x, ", i, cpu.mem->get(i));
+                        if ((i - (addr-20)) % 10 == 9) {
+                            printx ("\n");
+                        }
+                    }
+                }
+                else {
+                    printx ("Please provide a 4 digit hex address with m/md: mxxxx\n");
+                }
+            } else if (dbg_cmd[0] == 'd') {
+                if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", cpu.rf.debug0);
+                else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", cpu.rf.debug1);
+                else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", cpu.rf.debug2);
+            } else if (dbg_cmd[0] == 'i' && dbg_cmd[1] == 'd') {
+                disable_interrupts = !disable_interrupts;
+                printx ("disable_interrupts <= %0d\n", disable_interrupts);
+            }
+            
+            else if (dbg_cmd[0] == 'r') {
+                // DEBUGGER = false;   // disable debugger for rest of the run
+                exit_debugger = true;
+                run = true;
+            } else if (dbg_cmd[0] == 'l') {
+                // Line Count
+                printx("clock/step count = %lu\n", free_clk);
+            }
+            
+        } while (exit_debugger == false);
+
+    }
+}

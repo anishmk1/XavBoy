@@ -1,4 +1,24 @@
-#include <vector>
+#include <iostream>
+#include <fstream>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <array>
+#include <string>
+
+#include <cstdint>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring> // For strcmp
+#include <cassert>
+#include <set>
+
+#include "main.h"
+#include "Peripherals.h"
+#include "Memory.h"
+
 
 const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 
@@ -8,16 +28,20 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 *   16-bit access bus -> 2^16 = 65536 addresses
 *   So 2^16 * 1 Byte = 2^6 KB memory = 64 KB Memory
 */
-class Memory {
+// class Memory {
 
-    size_t romSize;
-    std::vector<uint8_t> mem;
+//     size_t romSize;
 
-public:
-    MMIO *mmio;
+// public:
+    // std::vector<uint8_t> mem;
+    // MMIO *mmio;
 
-    Memory (MMIO *mmio) {
-        this->mmio = mmio;
+    Memory::Memory () {
+        // this->mmio = mmio;
+        // mmio->mmio = &mem[0xFF00];      // MMIO region starts here
+        // mmio->mem = mem;
+        // mmio->mmio = &mem[0xFF00];
+        // mmio->init_mmio(mem[0xFF00]);
         // init all mem locations to 0
         mem = std::vector<uint8_t>(MEMORY_SIZE, 0);
 
@@ -79,52 +103,131 @@ public:
         mem[0xFFFF] = 0x00; // IE
     }
 
-    int set(int addr, uint8_t val) {
-        if (addr < 0 || addr >= MEMORY_SIZE) {
+    uint8_t Memory::access_memory_map(int addr, uint8_t val, bool read_nwr) {
+        if (addr < 0) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return 1;
-        } else if (addr <= 0x7fff) {
-            // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
-            return 1;
-        } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
-            addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
-        }
-
-        if (mmio->write(addr, val)) {
-            return 0;
-        }
-
-
-        // if (addr == 0x4244) {
-        //     print ("mem[0x4244] <= 0x%0x\n", mem[addr]);
-        // }
-        // if (val == 0xB1) {
-        //     printx ("mem[0x%0x] <= 0xB1\n", addr);
-        // }
-
-        // Valid Memory Write access
-        mem[addr] = val;
-        return 0;
-    }
-
-    uint8_t get(int addr) {
-        if (addr < 0 || addr >= MEMORY_SIZE) {
-            std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
-            return -1;
-        } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
-            addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
-        } else {
-            // TEMOPRARY OVERRIDES/HARDCODED VALUES
-            if (addr == (0xff44)) {
-                return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
+        } else if (addr <= 0x3FFF) {          // 16 KiB ROM bank 00
+            if (read_nwr) return mem[addr];
+            else return 1;  // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
+        } else if (addr <= 0x7FFF) {          // 16 KiB ROM bank 01–NN
+            if (read_nwr) return mem[addr];
+            else return 1;  // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
+        } else if (addr <= 0x9FFF) {          // 8 KiB Video RAM (VRAM) 
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
             }
-        }
+        } else if (addr <= 0xBFFF) {          // 8 KiB External RAM
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr <= 0xDFFF) {          // 4 KiB Work RAM (WRAM)
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr <= 0xFDFF) {          // Echo RAM
+            addr = 0xC000 + (addr - 0xE000);    // Remap addresses (E000 -> FDFF) to mirror (C000 -> DDFF)
 
-        // Valid Memory Read Access
-        return mem[addr];
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr <= 0xFE9F) {          // Object attribute memory (OAM)
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr <= 0xFEFF) {          // Not Usable
+            //Nintendo says use of this area is prohibited.
+            // std::cerr << "Memory access to \"Not Usable\" addr space: 0x" << std::hex << addr << std::endl;
+            // return 1;
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr <= 0xFF7F) {          // I/O Registers
+            return mmio->access(addr, read_nwr, val);
+        } else if (addr <= 0xFFFE) {          // High RAM (HRAM)
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else if (addr == 0xFFFF) {          // Interrupt Enable register (IE) 
+            if (read_nwr) return mem[addr];
+            else {
+                mem[addr] = val;
+                return 0;
+            }
+        } else {
+            std::cerr << "Memory access with out of bounds address: 0x" << std::hex << addr << std::endl;
+            return -1;
+        }
     }
 
-    void load_rom(uint8_t *rom_ptr, size_t file_size) {
+    int Memory::set(int addr, uint8_t val) {
+
+        // if ((addr == 0xc000) || addr == 0xe000) {
+        //     printx ("Setting addr: 0x%0x <= 0x%0x\n", addr, val);
+        //     breakpoint = true;
+        // }
+
+        return access_memory_map(addr, val, 0);
+        // if (addr < 0 || addr >= MEMORY_SIZE) {
+        //     std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
+        //     return 1;
+        // } else if (addr <= 0x7fff) {
+        //     // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
+        //     return 1;
+        // } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
+        //     addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
+        // }
+
+        // if (mmio->write(addr, val)) {
+        //     return 0;
+        // }
+
+
+        // // if (addr == 0x4244) {
+        // //     print ("mem[0x4244] <= 0x%0x\n", mem[addr]);
+        // // }
+        // // if (val == 0xB1) {
+        // //     printx ("mem[0x%0x] <= 0xB1\n", addr);
+        // // }
+
+        // // Valid Memory Write access
+        // mem[addr] = val;
+        // return 0;
+    }
+
+    uint8_t Memory::get(int addr) {
+        return access_memory_map(addr, 0xaf, 1);
+        // if (addr < 0 || addr >= MEMORY_SIZE) {
+        //     std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
+        //     return -1;
+        // } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
+        //     addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
+        // } else {
+        //     // TEMOPRARY OVERRIDES/HARDCODED VALUES
+        //     if (addr == (0xff44)) {
+        //         return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
+        //     }
+        // }
+
+        // // Valid Memory Read Access
+        // return mem[addr];
+    }
+
+    void Memory::load_rom(uint8_t *rom_ptr, size_t file_size) {
         int rom_start_addr = (LOAD_BOOT_ROM) ? 0 : 0x100;
         print ("Loading ROM into Memory Address 0x%0x....\n", rom_start_addr);
         print ("   file_size: %lu\n", file_size);
@@ -140,7 +243,7 @@ public:
         // dump_mem(300);
     }
 
-    void dump_mem(int around = 25, int range = 50) {
+    void Memory::dump_mem(int around, int range) {
         int start = around - (range / 2);
         int end = around + (range / 2);
         for (int i = start; i < end; i++) {
@@ -153,4 +256,4 @@ public:
     // void dump_ROM() {
     //     printf("")
     // }
-};
+// };

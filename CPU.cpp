@@ -1,50 +1,62 @@
-const bool USE_R8_INDEX = true;
-const int NUM_REGS = 6;
+#include <iostream>
+#include <fstream>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <array>
+#include <string>
 
+#include <cstdint>
+#include <cstdlib>
+#include <cstdio>
+#include <cstring> // For strcmp
+#include <cassert>
+#include <set>
+
+#include "main.h"
+#include "CPU.h"
+#include "Memory.h"
+#include "Peripherals.h"
 
 // FIXME: Use maps to map index to r8/r16 regs. A lot of functions could use this
 
-enum r16_index_t {AF,BC,DE,HL,SP,PC};
-enum r8_index_t {A, B, C, D, E, H, L, hl, F};
-enum r16mem_index_t {_BC, _DE, _HLi, _HLd};
-enum cc_t {nz, z, nc, c};
+// enum r16_index_t {AF,BC,DE,HL,SP,PC};
+// enum r8_index_t {A, B, C, D, E, H, L, hl, F};
+// enum r16mem_index_t {_BC, _DE, _HLi, _HLd};
+// enum cc_t {nz, z, nc, c};
 
-struct ExcludeFlags {
-    bool no_z = false;
-    bool no_n = false;
-    bool no_h = false;
-    bool no_c = false;
-};
 
-union Reg {
-    struct {
-        uint8_t lo;
-        uint8_t hi;
-    };
-    uint16_t val;
-    struct {
-        uint8_t rsvd : 4;       // FIXME: rsvd should always read 0 even if written to
-        uint8_t c    : 1;
-        uint8_t h    : 1;
-        uint8_t n    : 1;
-        uint8_t z    : 1;
-    } flags;
-};
+// union Reg {
+//     struct {
+//         uint8_t lo;
+//         uint8_t hi;
+//     };
+//     uint16_t val;
+//     struct {
+//         uint8_t rsvd : 4;       // FIXME: rsvd should always read 0 even if written to
+//         uint8_t c    : 1;
+//         uint8_t h    : 1;
+//         uint8_t n    : 1;
+//         uint8_t z    : 1;
+//     } flags;
+// };
 
-class RegFile {
-public:
-    Reg regs[NUM_REGS];
-    Memory *mem;        // for [hl]
+// class RegFile {
+// public:
+    // Reg regs[NUM_REGS];
+    // Memory *mem;        // for [hl]
 
-    // FIXME: move this somewhere that makes sense
-    uint16_t debug0;
-    uint16_t debug1;
-    uint16_t debug2;
+    // // FIXME: move this somewhere that makes sense
+    // uint16_t debug0;
+    // uint16_t debug1;
+    // uint16_t debug2;
 
-    uint16_t get(r16_index_t r16) {
+    uint16_t RegFile::get(r16_index_t r16) {
         return regs[r16].val;
     }
-    uint8_t get(r8_index_t r8) {
+    uint8_t RegFile::get(r8_index_t r8) {
         if (r8 == A) return regs[AF].hi;
         if (r8 == B) return regs[BC].hi;
         if (r8 == C) return regs[BC].lo;
@@ -57,7 +69,7 @@ public:
         print (" Unexpected index to get(r8_index_t) \n");
         exit(1);
     }
-    uint16_t get(r16mem_index_t r16mem, bool modify=false) {
+    uint16_t RegFile::get(r16mem_index_t r16mem, bool modify) {
         if (r16mem == _BC) return regs[BC].val;
         if (r16mem == _DE) return regs[DE].val;
         if (r16mem == _HLi) return ((modify) ? regs[HL].val++ : regs[HL].val);
@@ -66,7 +78,7 @@ public:
         exit(1);
     }
 
-    void set(r8_index_t r8, uint8_t val) {
+    void RegFile::set(r8_index_t r8, uint8_t val) {
         if (r8 == A) regs[AF].hi = val;
         else if (r8 == B) regs[BC].hi = val;
         else if (r8 == C) regs[BC].lo = val;
@@ -78,11 +90,11 @@ public:
         else if (r8 == hl) mem->set(regs[HL].val, val);
     }
 
-    void set(r16_index_t r16, uint16_t val) {
+    void RegFile::set(r16_index_t r16, uint16_t val) {
         regs[r16].val = val;
     }
 
-    bool check_cc(cc_t cc) {
+    bool RegFile::check_cc(cc_t cc) {
         if (cc == nz) return (regs[AF].flags.z == 0);
         else if (cc == z) return (regs[AF].flags.z == 1);
         else if (cc == nc) {
@@ -97,7 +109,7 @@ public:
         exit(1);
     }
 
-    static r8_index_t get_r8(int index) {
+    r8_index_t RegFile::get_r8(int index) {
         if (index == 0) return B;
         if (index == 1) return C;
         if (index == 2) return D;
@@ -111,7 +123,7 @@ public:
         exit(1);
     }
 
-    static r16_index_t get_r16(int index) {
+    r16_index_t RegFile::get_r16(int index) {
 
         if (index == 0) return BC;
         if (index == 1) return DE;
@@ -121,7 +133,7 @@ public:
         exit(1);
     }
 
-    static r16mem_index_t get_r16mem(int index) {
+    r16mem_index_t RegFile::get_r16mem(int index) {
         if (index == 0) return _BC;
         if (index == 1) return _DE;
         if (index == 2) return _HLi;
@@ -130,7 +142,7 @@ public:
         exit(1);
     }
 
-    static r16_index_t get_r16stk(int index) {
+    r16_index_t RegFile::get_r16stk(int index) {
         if (index == 0) return BC;
         if (index == 1) return DE;
         if (index == 2) return HL;
@@ -139,7 +151,7 @@ public:
         exit(1);
     }
 
-    static const char* get_reg_name(r8_index_t r8) {
+    const char* RegFile::get_reg_name(r8_index_t r8) {
         if (r8 == A) return "A";
         if (r8 == B) return "B";
         if (r8 == C) return "C";
@@ -155,7 +167,7 @@ public:
     }
 
 
-    static const char* get_reg_name(r16_index_t r16) {
+    const char* RegFile::get_reg_name(r16_index_t r16) {
         if (r16 == AF) return "AF";
         if (r16 == BC) return "BC";
         if (r16 == DE) return "DE";
@@ -167,10 +179,10 @@ public:
         exit(1);
     }
 
-    void print_regs() {
+    void RegFile::print_regs() {
         if (PRINT_REGS_EN == 0) return;
         if (GAMEBOY_DOCTOR) {
-            printv ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
+            printx ("A:%02X F:%02X B:%02X C:%02X D:%02X E:%02X H:%02X L:%02X SP:%04X PC:%04X PCMEM:%02X,%02X,%02X,%02X\n",
                     get(A), get(F), get(B), get(C), get(D), get(E), get(H), get(L), get(SP), get(PC),
                     mem->get(get(PC)), mem->get(get(PC)+1), mem->get(get(PC)+2), mem->get(get(PC)+3));
         } else {
@@ -178,21 +190,22 @@ public:
                         regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c, mem->get(get(HL)));
         }
     }
-};
+// };
 
 
-class CPU {
-public:
+// class CPU {
+// public:
 
-    Memory *mem;
-    RegFile rf;
+//     Memory *mem;
+//     RegFile rf;
 
 
 
-    // Default constructor
-    CPU (Memory *mem) {
+    CPU::CPU (Memory *mem) {
         rf.mem = mem;
         this->mem = mem;
+
+        this->intrpt_info.interrupt_valid = false;
 
         if (SKIP_BOOT_ROM) {
             // Load initial system state after BOOT_ROM 
@@ -214,20 +227,35 @@ public:
     // add a destructor
 
 
-    void execute() {
+    void CPU::execute(bool& halt_cpu) {
         bool nop = false;
+        uint8_t cmd;
 
-        // uint16_t *reg_ptr;
-        uint8_t cmd = mem->get(rf.regs[PC].val);
-
+        // FIRST Get next cmd and print results of prev instruction before further processing of "NEW" state
+        cmd = mem->get(rf.regs[PC].val);
         if (GAMEBOY_DOCTOR) {
             rf.print_regs();
         }
+
+        // Process NEW state.....
         // check for infinite loop
         if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
             print ("Detected Infinite loop. Exiting sim\n");
             std::exit(EXIT_SUCCESS);
         }
+
+        // Interrupt handling
+        rf.debug0 = mem->mmio->IME;
+        set_new_interrupts();
+        if (handle_interrupts()) {
+            if (intrpt_info.wait_cycles > 0) return;
+            else {
+                // PC was updated to interrupt handler:
+                // Re-fetch cmd with new PC 
+                cmd = mem->get(rf.regs[PC].val);
+            }
+        }
+        
 
         // increment PC
         rf.regs[PC].val++;
@@ -432,7 +460,8 @@ public:
         else if (match(cmd, "01xxxxxx")) {                  // ld r8, r8
             if (match(cmd, "01110110")) {
                 printx ("    detected: HALT");
-                std::exit(EXIT_SUCCESS);
+                // HALT => Wait for interrupt (clks keep running)
+                halt_cpu = true;
             } else {
                 print("    detected: ld r8, r8 ----");
                 int regd_bits = ((cmd >> 3) & 0b111);
@@ -746,11 +775,13 @@ public:
 
             mem->set(0xff00 + rf.get(C), rf.get(A));
         } else if (match(cmd, "11100000")) {                // ldh imm8, a
-            print ("    detected: ldh imm8, a\n");
+            print ("    detected: ldh imm8, a ---");
 
             uint8_t imm8 = mem->get(rf.get(PC)); 
             rf.regs[PC].val += 1;
-            mem->set(0xff00 + imm8, rf.get(A));
+            uint16_t addr = 0xff00 + imm8;
+            mem->set(addr, rf.get(A));
+            print (" mem[0x%0x] <= A(0x%0x)\n", addr, rf.get(A));
         } else if (match(cmd, "11101010")) {                // ld [imm16], a
             print ("    detected: ld [imm16], a\n");
 
@@ -828,15 +859,13 @@ public:
         if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
 
         serial_output();
-
-        check_and_handle_interrupts();
     }
 
 
-private:
+// private:
 
     // Implement wildcard matching - cmd=1010 matches compare="10xx"
-    bool match(uint8_t cmd, const char *compare) {
+    bool CPU::match(uint8_t cmd, const char *compare) {
         int cmd_bit, compare_bit;
         for (int i = 0; i < 8; i++) {
             if (compare[i] == 'x') continue;
@@ -848,7 +877,7 @@ private:
         return true;
     }
 
-    bool add16_overflowFromBitX(int bit, uint16_t a=0, uint16_t b=0, uint16_t c=0) {
+    bool CPU::add16_overflowFromBitX(int bit, uint16_t a, uint16_t b, uint16_t c) {
         if (bit > 15) {
             printx ("Invalid bit provided to add16_overflow\n");
             std::exit(EXIT_FAILURE);
@@ -868,7 +897,7 @@ private:
         return false;
     }
 
-    bool sub_borrowFromBitX(int bit,  uint16_t A=0, uint16_t b=0, uint16_t c=0) {
+    bool CPU::sub_borrowFromBitX(int bit,  uint16_t A, uint16_t b, uint16_t c) {
         if (bit < 0 || bit > 15) {
             printx ("Invalid bit=%d provided to sub_borrowFromBitX\n", bit);
             std::exit(EXIT_FAILURE);
@@ -886,21 +915,21 @@ private:
         return false;
     }
 
-    void compute_flags_add8(int a, int b, ExcludeFlags ex = ExcludeFlags()) {
+    void CPU::compute_flags_add8(int a, int b, ExcludeFlags ex) {
         if (!ex.no_z) rf.regs[AF].flags.z = ((((a & 0xFF) + (b & 0xFF)) & 0xFF) == 0);
         if (!ex.no_n) rf.regs[AF].flags.n = 0;
         if (!ex.no_h) rf.regs[AF].flags.h = (((a & 0x0F) + (b & 0x0F)) > 0x0F);   // carry at bit 3?
         if (!ex.no_c) rf.regs[AF].flags.c = (((a & 0xFF) + (b & 0xFF)) > 0xFF);   // carry at bit 7?
     }
 
-    void compute_flags_sub8(int a, int b, ExcludeFlags ex = ExcludeFlags()) {
+    void CPU::compute_flags_sub8(int a, int b, ExcludeFlags ex) {
         if (!ex.no_z) rf.regs[AF].flags.z = ((((a & 0xFF) - (b & 0xFF)) & 0xFF) == 0);
         if (!ex.no_n) rf.regs[AF].flags.n = 1;
         if (!ex.no_h) rf.regs[AF].flags.h = ((b & 0xF) > (a & 0xF));              // borrow from bit 4?
         if (!ex.no_c) rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
     }
 
-    bool get_block2_3_operand(uint8_t cmd, uint8_t &operand) {
+    bool CPU::get_block2_3_operand(uint8_t cmd, uint8_t &operand) {
         bool imm_or_reg;
         if ((cmd >> 6) & 0b1) {
             operand = mem->get(rf.regs[PC].val);     // imm8
@@ -916,7 +945,7 @@ private:
         return imm_or_reg;
     }
 
-    void pop_r16_stack(r16_index_t r16) {
+    void CPU::pop_r16_stack(r16_index_t r16) {
         // load [SP] into r16       (in little endian)
         rf.regs[r16].lo = mem->get(rf.get(SP));
         rf.set(SP, rf.get(SP) + 1);
@@ -940,24 +969,52 @@ private:
      * Lower addresses
      */
 
-    void push_val_stack(uint16_t val) {
+    void CPU::push_val_stack(uint16_t val) {
         rf.set(SP, rf.get(SP) - 1);   // decrement SP
         mem->set(rf.get(SP), (val >> 8) & 0xff);    // Write higher-order byte of val
         rf.set(SP, rf.get(SP) - 1);   // decrement SP
         mem->set(rf.get(SP), val & 0xff);           // Write lower-order byte of val
     }
 
-    void check_and_handle_interrupts() {
-        uint16_t intr_handler_addr;
-
-        if (mem->mmio->check_interrupts(intr_handler_addr)) {
-            push_val_stack(rf.regs[PC].val);
-            rf.regs[PC].val = intr_handler_addr; 
+    bool CPU::handle_interrupts() {
+        if (intrpt_info.interrupt_valid) {
+            if (intrpt_info.wait_cycles == 0) {
+                push_val_stack(rf.regs[PC].val);
+                rf.regs[PC].val = intrpt_info.handler_addr; 
+                intrpt_info.interrupt_valid = false;
+            } else {
+                intrpt_info.wait_cycles--;
+            }
+            return true;
         }
+
+        return false;   // no interrupts detected => continue normal execution
+    }
+
+    // bool CPU::check_and_handle_interrupts() {
+    bool CPU::set_new_interrupts() {
+
+        if (mem->mmio->check_interrupts(intrpt_info.handler_addr)) {
+            // 1. Two wait states are executed (2 M-cycles pass 
+            //     while nothing happens; 
+            //     presumably the CPU is executing nops during this time).
+            
+            // MISSING ^^
+            // cpu_nops = 2;
+
+            intrpt_info.interrupt_valid = true;
+            intrpt_info.wait_cycles = 0;
+            return true;
+            // push_val_stack(rf.regs[PC].val);
+            // rf.regs[PC].val = intrpt_info.handler_addr; 
+            // return true;
+        }
+
+        return false;   // No interrupts triggered
     }
     
     //    blarggs test - serial output
-    void serial_output() {
+    void CPU::serial_output() {
         if (mem->get(0xff02) == 0x81) {
             char c = static_cast<char>(mem->get(0xff01));
             std::clog << c;
@@ -966,4 +1023,4 @@ private:
             mem->set(0xff02, 1);
         }    
     }
-};
+// };
