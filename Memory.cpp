@@ -175,56 +175,21 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
     }
 
     int Memory::set(int addr, uint8_t val) {
+        if (addr == 0xff0f) {
+            dbg->bp_info.breakpoint = true;
+            dbg->bp_info.msg = "Setting memory addr 0xff0f";
+        }
+        if (addr == 0xff07) {
+            dbg->bp_info.breakpoint = true;
+            dbg->bp_info.msg = "Setting memory addr 0xff07";
+        }
 
-        // if ((addr == 0xc000) || addr == 0xe000) {
-        //     printx ("Setting addr: 0x%0x <= 0x%0x\n", addr, val);
-        //     breakpoint = true;
-        // }
 
         return access_memory_map(addr, val, 0);
-        // if (addr < 0 || addr >= MEMORY_SIZE) {
-        //     std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
-        //     return 1;
-        // } else if (addr <= 0x7fff) {
-        //     // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
-        //     return 1;
-        // } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
-        //     addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
-        // }
-
-        // if (mmio->write(addr, val)) {
-        //     return 0;
-        // }
-
-
-        // // if (addr == 0x4244) {
-        // //     print ("mem[0x4244] <= 0x%0x\n", mem[addr]);
-        // // }
-        // // if (val == 0xB1) {
-        // //     printx ("mem[0x%0x] <= 0xB1\n", addr);
-        // // }
-
-        // // Valid Memory Write access
-        // mem[addr] = val;
-        // return 0;
     }
 
     uint8_t Memory::get(int addr) {
         return access_memory_map(addr, 0xaf, 1);
-        // if (addr < 0 || addr >= MEMORY_SIZE) {
-        //     std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
-        //     return -1;
-        // } else if (addr >= 0xE000 && addr <= 0xFDFF) {     // Echo RAM
-        //     addr = 0xC000 + (addr - 0xE000);    // Remap address to mirror C000 - DDFF
-        // } else {
-        //     // TEMOPRARY OVERRIDES/HARDCODED VALUES
-        //     if (addr == (0xff44)) {
-        //         return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
-        //     }
-        // }
-
-        // // Valid Memory Read Access
-        // return mem[addr];
     }
 
     void Memory::load_rom(uint8_t *rom_ptr, size_t file_size) {

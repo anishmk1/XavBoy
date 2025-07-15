@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     Memory *mem = new Memory();
     MMIO *mmio  = new MMIO(mem);
     CPU *cpu    = new CPU(mem);
-    dbg         = new Debug();
+    dbg = new Debug();
 
      
     

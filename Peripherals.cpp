@@ -120,16 +120,16 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
             int incr_count = 0;
             switch (tac_select) {
                 case 0:
-                    incr_count = 256'000'000;
+                    incr_count = 256 * 4;   // 256 M-cycles (* 4 T-cycles)
                     break;
                 case 1:
-                    incr_count = 4'000'000;
+                    incr_count = 4 * 4;     // 4 M-cycles (* 4 T-cycles)
                     break;
                 case 2:
-                    incr_count = 16'000'000;
+                    incr_count = 16 * 4;
                     break;
                 case 3:
-                    incr_count = 64'000'000;
+                    incr_count = 64 * 4;
                     break;
                 default:
                     printx ("incr timers - hit default case. Fail\n");
@@ -172,7 +172,9 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
                 IME_ff[0] = 0;
                 IME_ff[1] = 0;
 
-                dbg->breakpoint = true;
+                // dbg->breakpoint = true;
+                dbg->bp_info.breakpoint = true;
+                dbg->bp_info.msg = "Hit TIMER Interrupt";
                 return true;
             }
         }

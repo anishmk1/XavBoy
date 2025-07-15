@@ -449,7 +449,8 @@
                 print (" cc: 0x%0x; branch not taken\n", cc);
             }
         } else if (match(cmd, "00010000")) {                // stop
-            print ("    detected: stop\n");
+            printx ("    detected: stop\n");
+            mem->set(0xff07, 0);        // reset DIV register FIXME: DIV should only start ticking again once cpu is out of stop mode...
             rf.regs[PC].val++;         // stop is NOP but 2 cycles (FIXME: need to pair this with WAKE?)
             std::exit(EXIT_SUCCESS);
         } 

@@ -12,6 +12,8 @@ Debug::Debug() {
     num_steps_left = 0;
     run = false;
     tgt_instr = 0xd3;
+    bp_info.breakpoint = false;
+    bp_info.disable_breakpoints = false;
 }
 
 
@@ -40,9 +42,10 @@ void Debug::debugger_break(CPU &cpu) {
         }
     }
     // If breakpoint is triggered in code, break execution (priority = 1)
-    if (breakpoint) {
+    if (!bp_info.disable_breakpoints && bp_info.breakpoint) {
+        printx ("Hit breakpoint! \"%s\"\n", bp_info.msg.c_str());
         break_execution = true;
-        breakpoint = false;
+        bp_info.breakpoint = false;
         num_steps_left = 0;
         tgt_instr = 0xd3;
     }
@@ -65,7 +68,12 @@ void Debug::debugger_break(CPU &cpu) {
                     if (dbg_cmd[1] == 'i') {
                         // step to instruction:
                         tgt_instr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
+                    } else if (dbg_cmd[1] == 't') {
+                        // Step to right before line number xxxx
+                        int step_input = std::stoi(dbg_cmd.substr(2));
+                        num_steps_left = step_input - free_clk - 1;
                     } else {
+                        // Step xxxx lines
                         int step_input = std::stoi(dbg_cmd.substr(1));
                         num_steps_left = (step_input == 0) ? 0 : (step_input - 1);
                     }
@@ -103,9 +111,10 @@ void Debug::debugger_break(CPU &cpu) {
             } else if (dbg_cmd[0] == 'i' && dbg_cmd[1] == 'd') {
                 disable_interrupts = !disable_interrupts;
                 printx ("disable_interrupts <= %0d\n", disable_interrupts);
-            }
-            
-            else if (dbg_cmd[0] == 'r') {
+            } else if (dbg_cmd[0] == 'b' && dbg_cmd[1] == 'd') {
+                bp_info.disable_breakpoints = !bp_info.disable_breakpoints;
+                printx ("disable_breakpoints <= %0d\n", bp_info.disable_breakpoints);
+            } else if (dbg_cmd[0] == 'r') {
                 // DEBUGGER = false;   // disable debugger for rest of the run
                 exit_debugger = true;
                 run = true;
