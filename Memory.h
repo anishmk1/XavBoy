@@ -2,6 +2,8 @@
 #ifndef MEMORY_H
 #define MEMORY_H
 
+#include <vector>
+
 class MMIO;
 
 class Memory {

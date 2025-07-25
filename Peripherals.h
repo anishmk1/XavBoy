@@ -2,9 +2,13 @@
 #ifndef PERIPHERALS_H
 #define PERIPHERALS_H
 
+#include <vector>
+
 class Memory;
 
 class MMIO {
+
+    uint16_t system_counter;
     
 public:
     bool IME = 0;                   // Interrupt Master Enable
@@ -14,7 +18,7 @@ public:
 
     void set_ime();
     void clear_ime();
-    void incr_timers(int free_clk);
+    void incr_timers(int mcycles);
     bool check_interrupts(uint16_t &intr_handler_addr);
     uint8_t access(int addr, bool read_nwr, uint8_t val=0);
 

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdio>
+#include <sstream>
 
 #include "main.h"
 #include "CPU.h"
@@ -11,9 +12,22 @@ Debug::Debug() {
     free_clk = 0;
     num_steps_left = 0;
     run = false;
-    tgt_instr = 0xd3;
+    tgt_instr = 0xd3;   // Init to some illegal value that I would never target
     bp_info.breakpoint = false;
     bp_info.disable_breakpoints = false;
+}
+
+void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
+    // std::string dbg_cmd;
+    std::getline(std::cin, dbg_cmd);
+
+    std::istringstream iss(dbg_cmd);
+    
+    std::string word;
+
+    while (iss >> word) {
+        words.push_back(word);
+    }
 }
 
 
@@ -21,6 +35,8 @@ Debug::Debug() {
 // Can also use the vars to interract with the program automatically
 // num_steps_left, breakpoint, run, clk_cnt, tg_instr etc etc
 void Debug::debugger_break(CPU &cpu) {
+    free_clk++;
+
     bool exit_debugger = false;
     bool break_execution = true;
     // If run, dont break execution (priority = 4)
@@ -56,7 +72,9 @@ void Debug::debugger_break(CPU &cpu) {
             PRINT_REGS_EN = true;
             printx (">> ");
             std::string dbg_cmd;
-            std::cin >> dbg_cmd;
+            std::vector<std::string> words;
+            parse_dbg_cmd(dbg_cmd, words);
+            if (words.empty()) continue;
 
             if (dbg_cmd[0] == 'h') {    // help
                 printx ("Debug commands: 'sx'(step); 'r'(run); 'p'(print regs); 'mxxxx'(Read mem addr)\n");

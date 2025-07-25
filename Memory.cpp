@@ -175,14 +175,18 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
     }
 
     int Memory::set(int addr, uint8_t val) {
-        if (addr == 0xff0f) {
-            dbg->bp_info.breakpoint = true;
-            dbg->bp_info.msg = "Setting memory addr 0xff0f";
-        }
-        if (addr == 0xff07) {
-            dbg->bp_info.breakpoint = true;
-            dbg->bp_info.msg = "Setting memory addr 0xff07";
-        }
+        // if (addr == 0xff0f) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "Setting memory addr 0xff0f";
+        // }
+        // if (addr == 0xff07) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "Setting memory addr 0xff07";
+        // }
+        // if (addr == 0x4244) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "Setting memory addr 0x4244";
+        // }
 
 
         return access_memory_map(addr, val, 0);

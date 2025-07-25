@@ -37,24 +37,11 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
     const uint16_t IE = 0xffFF;     // Interrupt enable -- 0xFFFF
     const uint16_t IF = 0xff0F;     // Interrupt flag   -- 0xFF0F
 
-    // // MemoryMappedArray<int, 10, 0xFF00> mmio;
-    // // std::array<uint8_t, 10> mmio;
-    // std::unordered_map<uint16_t, uint8_t> mmio = {
-    //     {DIV, 0x18}, {TIMA, 0x00},
-    //     {TMA, 0x00}, {TAC, 0xF8},
-    //     {IE, 0x00}, {IF, 0xE1}
-    // };
-
-// public:
-    // bool IME = 0;                   // Interrupt Master Enable
-    // bool IME_ff[2];
-    // uint8_t *mmio;
-    // std::vector<uint8_t> &mem;
-
     MMIO::MMIO (Memory *memory)
         : mem(memory->mem) {
         // this->mem = memory->mem;    // Will be overridden in Memory()
         memory->mmio = this;
+        system_counter = 0;
     }
 
     // void init_mmio(std::vector<uint8_t>& mem){
@@ -112,43 +99,73 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
         this->IME = 0;
     }
 
-    void MMIO::incr_timers(int free_clk) {
+    void MMIO::incr_timers(int mcycles) {
+
+        // system_counter += mcycles;       // This should happen once every M-cycle
         
-        if ((mem[TAC] >> 2) & 0b1) {   // Only increment TIMA if TAC Enable set
-            print ("Inside if statement\n");
-            int tac_select = (mem[TAC]) & 0b11;
-            int incr_count = 0;
-            switch (tac_select) {
-                case 0:
-                    incr_count = 256 * 4;   // 256 M-cycles (* 4 T-cycles)
-                    break;
-                case 1:
-                    incr_count = 4 * 4;     // 4 M-cycles (* 4 T-cycles)
-                    break;
-                case 2:
-                    incr_count = 16 * 4;
-                    break;
-                case 3:
-                    incr_count = 64 * 4;
-                    break;
-                default:
-                    printx ("incr timers - hit default case. Fail\n");
-                    std::exit(EXIT_FAILURE);
-                    break;
-            }
 
-            if (free_clk % incr_count == 0) {   // Increment TIMA
-                mem[TIMA]++;
-                if (mem[TIMA] == 0) {
-                    mem[TIMA] = mem[TMA]; // When the value overflows (exceeds $FF) it is reset to the value specified in TMA (FF06) and an interrupt is requested
-                    mem[IF] |= TIMER_BIT;
+        for (int i = 0; i < mcycles; i++) {
+            system_counter++;
+            if (system_counter == (2^14)) system_counter = 0;       // system_counter should actually only be 14 bits. This models that
 
+
+            if ((mem[TAC] >> 2) & 0b1) {   // Only increment TIMA if TAC Enable set
+                print ("Inside if statement\n");
+                int tac_select = (mem[TAC]) & 0b11;
+                int incr_count = 0;
+                switch (tac_select) {
+                    case 0:
+                        incr_count = 256;   // 256 M-cycles (* 4 T-cycles)
+                        // incr_count = 256 * 4;   // 256 M-cycles (* 4 T-cycles)
+                        break;
+                    case 1:
+                        incr_count = 4;     // 4 M-cycles (* 4 T-cycles)
+                        // incr_count = 4 * 4;     // 4 M-cycles (* 4 T-cycles)
+                        break;
+                    case 2:
+                        incr_count = 16;
+                        break;
+                    case 3:
+                        incr_count = 64;
+                        break;
+                    default:
+                        printx ("incr timers - hit default case. Fail\n");
+                        std::exit(EXIT_FAILURE);
+                        break;
+                }
+
+                if (system_counter % incr_count == 0) {   // Increment TIMA
+                // if (free_clk % incr_count == 0) {   // Increment TIMA        // GET FREE CLK FROM MAIN.CPP
+                    mem[TIMA]++;
+                    if (mem[TIMA] == 0) {
+                        mem[TIMA] = mem[TMA]; // When the value overflows (exceeds $FF) it is reset to the value specified in TMA (FF06) and an interrupt is requested
+                        mem[IF] |= TIMER_BIT;
+
+                    }
                 }
             }
+
+
+            // DIV Register
+            int old_div = mem[DIV];
+            mem[DIV] = ((system_counter >> 6) & 0xff);      // DIV is just the "visible part" (bits [13:6]) of system counter
+            // Below for Game Boy Color Only
+            // bool double_speed_mode = false;
+            // int falling_edge_bit = (double_speed_mode) ? (6+4) : (6+5);
+            if (((mem[DIV] >> (4+6)) & 0b1) == 0 && 
+                (( old_div >> (4+6)) & 0b1) == 1) {     // Detected bit 4 falling edge
+                    // 
+                    // DIV-APU event
+                    // 
+            }
+
+
+
         }
 
-        mem[DIV]++;
+        // mem[DIV]++;
 
+        // FIXME:: Worry about IME flip flop modeling if I want cycle accurate emulation
         IME = IME_ff[1];
         IME_ff[1] = IME_ff[0];
     }
@@ -156,6 +173,7 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
     bool MMIO::check_interrupts(uint16_t &intr_handler_addr) {
         // if (dbg->free_clk == 151382) dbg->disable_interrupts = true;    // FIXME: get rid of this line
         if (dbg->disable_interrupts) return false;
+        // return false;
 
         if (IME) {
             // FIXME: change this to do [IE] & [IF] and process the result based on interrupt priotity

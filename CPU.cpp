@@ -227,9 +227,13 @@
     // add a destructor
 
 
-    void CPU::execute(bool& halt_cpu) {
+    /**
+     * Return: number of M-Cycles taken
+     */
+    int CPU::execute(bool& halt_cpu) {
         bool nop = false;
         uint8_t cmd;
+        int mcycles = 1;
 
         // FIRST Get next cmd and print results of prev instruction before further processing of "NEW" state
         cmd = mem->get(rf.regs[PC].val);
@@ -248,12 +252,12 @@
         rf.debug0 = mem->mmio->IME;
         set_new_interrupts();
         if (handle_interrupts()) {
-            if (intrpt_info.wait_cycles > 0) return;
-            else {
+            // if (intrpt_info.wait_cycles > 0) return;
+            // else {
                 // PC was updated to interrupt handler:
                 // Re-fetch cmd with new PC 
                 cmd = mem->get(rf.regs[PC].val);
-            }
+            // }
         }
         
 
@@ -266,6 +270,7 @@
         if (cmd == 0) {                                     // nop
             nop = true;
             print ("    detected: nop\n");
+            mcycles = 1;
         } else if (match(cmd, "00xx0001")) {                // ld r16, imm16
             print("    detected: ld r16, imm16 ---");
             // next 2 bytes are the immediate
@@ -274,12 +279,14 @@
             r16_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
             rf.regs[reg_idx].val = imm16;
             rf.regs[PC].val += 2;
+            mcycles = 3;
 
             print (" r[%s] <= 0x%0x\n", RegFile::get_reg_name(reg_idx), imm16);
         } else if (match(cmd, "00xx0010")) {                // ld [r16mem], a
             print("    detected: ld dest[r16mem], a ----");
             r16mem_index_t reg_idx = RegFile::get_r16mem(((cmd >> 4) & 0b11));
             mem->set(rf.get(reg_idx, true), rf.regs[AF].hi);
+            mcycles = 2;
 
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00xx1010")) {                // ld a, [r16mem]	
@@ -289,6 +296,7 @@
 
             rf.regs[AF].hi = (mem->get(addr));
             
+            mcycles = 2;
             // assert (mem->get(regs[reg_idx].val) == ((*(get_r16(7, USE_R8_INDEX))) >> 8));  // a == mem[r16]
         } else if (match(cmd, "00001000")) {                // ld [imm16], sp
             print("    detected ld [imm16], sp\n");
@@ -298,15 +306,18 @@
             mem->set(imm16, rf.regs[SP].lo);
             mem->set(imm16+1, rf.regs[SP].hi);
 
+            mcycles = 5;
         } else if (match(cmd, "00xx0011")) {                // inc r16
             print("    detected: inc r16\n");
             
             int reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
             rf.regs[reg_idx].val++;
+            mcycles = 2;
         } else if (match(cmd, "00xx1011")) {                // dec r16
             print("    detected: dec r16\n");
             int reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
             rf.regs[reg_idx].val--;
+            mcycles = 2;
         } else if (match(cmd, "00xx1001")) {                // add hl, r16
             print("    detected: add hl, r16\n");
             r16_index_t reg_idx = RegFile::get_r16(((cmd >> 4) & 0b11));
@@ -315,7 +326,7 @@
             rf.regs[AF].flags.c = add16_overflowFromBitX(15, rf.get(HL), rf.get(reg_idx));
 
             rf.regs[HL].val += rf.regs[reg_idx].val;
-
+            mcycles = 2;
         } else if (match(cmd, "00xxx100")) {                // inc r8
             print("    detected: inc r8 ---");
             int reg_bits = ((cmd >> 3) & 0b111);
@@ -323,6 +334,7 @@
             compute_flags_add8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
             rf.set(reg_idx, rf.get(reg_idx) + 1);
 
+            mcycles = 1;
             print(" incrementing reg %s\n", RegFile::get_reg_name(reg_idx));
             // print(" incrementing reg %s\n", RegFile::get_reg_name(reg_bits, USE_R8_INDEX).c_str());
         } else if (match(cmd, "00xxx101")) {                // dec r8
@@ -332,6 +344,7 @@
             compute_flags_sub8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
             rf.set(reg_idx, rf.get(reg_idx) - 1); 
 
+            mcycles = 1;
             print(" decrementing reg %s\n", RegFile::get_reg_name(reg_idx));
 
         } else if (match(cmd, "00xxx110")) {                // ld r8, imm8
@@ -342,6 +355,7 @@
             rf.set(r8, imm8);
 
             rf.regs[PC].val++;
+            mcycles = 2;
             print (" r[%s] <= 0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
         } else if (match(cmd, "00000111")) {                // rlca
             print("    detected: rlca --- ");
@@ -352,6 +366,7 @@
             rf.regs[AF].flags.z = 0;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
             print("rotated left A. carry=msb=%d\n", msb);
         } else if (match(cmd, "00001111")) {                // rrca
             print("    detected: rrca --- ");
@@ -362,6 +377,7 @@
             rf.regs[AF].flags.z = 0;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
             print("rotated right A. carry=lsb=%d\n", lsb);
         } else if (match(cmd, "00010111")) {                // rla
             print("    detected: rla --- ");
@@ -372,6 +388,7 @@
             rf.regs[AF].flags.z = 0;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
             print("rotated left A. carry=msb=%d\n", msb);
         } else if (match(cmd, "00011111")) {                // rra
             print("    detected: rra --- ");
@@ -384,6 +401,7 @@
             rf.regs[AF].flags.z = 0;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
             print("rotated left A. carry=lsb=%d\n", lsb);
         } else if (match(cmd, "00100111")) {                // daa
             print("    detected: daa --- \n");
@@ -404,28 +422,32 @@
             // if (rf.regs[AF].hi == 0) rf.regs[AF].flags.z = 1;
             rf.regs[AF].flags.z = (rf.get(A) == 0);
             rf.regs[AF].flags.h = 0;
-            // FIXME: c flag idk what to do
+            mcycles = 1;
         } else if (match(cmd, "00101111")) {                // cpl
             print("    detected: cpl --- \n");
             rf.regs[AF].hi = ~rf.regs[AF].hi;
             rf.regs[AF].flags.n = 1;
             rf.regs[AF].flags.h = 1;
+            mcycles = 1;
         } else if (match(cmd, "00110111")) {                // scf
             print("    detected: scf\n");
             rf.regs[AF].flags.c = 1;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
         } else if (match(cmd, "00111111")) {                // ccf
             print("    detected: ccf\n");
             rf.regs[AF].flags.c = ~rf.regs[AF].flags.c;
             rf.regs[AF].flags.n = 0;
             rf.regs[AF].flags.h = 0;
+            mcycles = 1;
         } else if (match(cmd, "00011000")) {                // jr imm8
             print("    detected: jr imm8 ---");
             int8_t imm8 = mem->get(rf.regs[PC].val);
             rf.regs[PC].val++;          // JR instr is 2 bytes long. So PC is incremented once to cover reading the imm8. Then the actual jump is done
             rf.regs[PC].val += imm8;
             print (" PC += 0x%0x\n", imm8);
+            mcycles = 3;
 
             //
             //
@@ -445,13 +467,16 @@
             if (rf.check_cc(cc)) {
                 rf.regs[PC].val += imm8;
                 print (" cc: 0x%0x; branch taken: PC <= 0x%0x\n", cc, imm8);
+                mcycles = 3;
             } else {
                 print (" cc: 0x%0x; branch not taken\n", cc);
+                mcycles = 2;
             }
         } else if (match(cmd, "00010000")) {                // stop
             printx ("    detected: stop\n");
             mem->set(0xff07, 0);        // reset DIV register FIXME: DIV should only start ticking again once cpu is out of stop mode...
             rf.regs[PC].val++;         // stop is NOP but 2 cycles (FIXME: need to pair this with WAKE?)
+            mcycles = 1;
             std::exit(EXIT_SUCCESS);
         } 
 
@@ -471,6 +496,7 @@
                 r8_index_t reg_s = RegFile::get_r8(regs_bits); //RegFile::get_r16(regs_bits, USE_R8_INDEX);
                 rf.set(reg_d, rf.get(reg_s));
             }
+                mcycles = 1;
         }
         
         /////////////////////////////////
@@ -478,7 +504,7 @@
         ///////////////////////////////
         else if (match(cmd, "10000xxx") || match(cmd, "11000110")) {                  // add a, r8          add a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: add a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: add a, imm8 ---");
             else print ("    detected: add a, r8 ---");            
             
             compute_flags_add8(rf.get(A), operand);
@@ -487,7 +513,7 @@
             print (" A += (0x%0x)\n", operand);
         } else if (match(cmd, "10001xxx") || match(cmd, "11001110")) {                // adc a, r8          adc a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: adc a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: adc a, imm8 ---");
             else print ("    detected: adc a, r8 ---");
 
             uint8_t val = rf.get(A) + rf.regs[AF].flags.c + operand;
@@ -501,7 +527,7 @@
             // rf.regs[AF].hi += (rf.regs[AF].flags.c + operand);
         } else if (match(cmd, "10010xxx") || match(cmd, "11010110")) {                // sub a, r8          sub a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: sub a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: sub a, imm8 ---");
             else print ("    detected: sub a, r8 ---");
 
             compute_flags_sub8(rf.get(A), operand);
@@ -509,7 +535,7 @@
             print (" A -= (0x%0x)\n", operand);
         } else if (match(cmd, "10011xxx") || match(cmd, "11011110")) {                // sbc a, r8          sbc a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: sbc a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: sbc a, imm8 ---");
             else print ("    detected: sbc a, r8 ---");
 
             int carry = rf.regs[AF].flags.c;
@@ -520,7 +546,7 @@
             rf.regs[AF].hi -= (operand + carry);
         } else if (match(cmd, "10100xxx") || match(cmd, "11100110")) {                // and a, r8          and a, imm8 
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: and a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: and a, imm8 ---");
             else print ("    detected: and a, r8 ---");
 
             rf.set(A, (rf.get(A) & operand));
@@ -532,7 +558,7 @@
             print (" A &= 0x%0x\n", operand);
         } else if (match(cmd, "10101xxx") || match(cmd, "11101110")) {                // xor a, r8          xor a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: xor a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: xor a, imm8 ---");
             else print ("    detected: xor a, r8 ---");
 
             rf.set(A, (rf.get(A) ^ operand));
@@ -544,8 +570,8 @@
             print (" A ^= 0x%0x\n", operand);
         } else if (match(cmd, "10110xxx") || match(cmd, "11110110")) {                // or a, r8           or a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: or a, imm8 ---");
-            else print ("    detected: or a, r8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: or a, imm8 ---");
+            else print ("    detected: or a, r8 ---")   ;
 
             rf.set(A, (rf.get(A) | operand));
 
@@ -556,7 +582,7 @@
             print (" A |= 0x%0x\n", operand);
         } else if (match(cmd, "10111xxx") || match(cmd, "11111110")) {                // cp a, r8           cp a, imm8
             uint8_t operand;
-            if (get_block2_3_operand(cmd, operand)) print ("    detected: cp a, imm8 ---");
+            if (get_block2_3_operand(cmd, operand, mcycles)) print ("    detected: cp a, imm8 ---");
             else print ("    detected: cp a, r8 ---\n");
 
             compute_flags_sub8(rf.get(A), operand);
@@ -860,6 +886,8 @@
         if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
 
         serial_output();
+
+        return mcycles;
     }
 
 
@@ -930,17 +958,19 @@
         if (!ex.no_c) rf.regs[AF].flags.c = ((b & 0xFF) > (a & 0xFF));            // borrow (i.e r8 > A)?
     }
 
-    bool CPU::get_block2_3_operand(uint8_t cmd, uint8_t &operand) {
+    bool CPU::get_block2_3_operand(uint8_t cmd, uint8_t &operand, int &mcycles) {
         bool imm_or_reg;
         if ((cmd >> 6) & 0b1) {
             operand = mem->get(rf.regs[PC].val);     // imm8
             imm_or_reg = true;
             rf.regs[PC].val += 1;
+            mcycles = 2;
         } else {
             int reg_bits = (cmd & 0b111);
             r8_index_t r8 = RegFile::get_r8(reg_bits);
             operand = rf.get(r8);
             imm_or_reg = false;
+            mcycles = 1;
         }
 
         return imm_or_reg;

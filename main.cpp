@@ -144,8 +144,11 @@ int main(int argc, char* argv[]) {
     while (true) {  // main loop
         if (DEBUGGER) dbg->debugger_break(*cpu);
 
-        mmio->incr_timers(++dbg->free_clk);
-        if (!halt_cpu) cpu->execute(halt_cpu);
+        int mcycles;
+        if (!halt_cpu) {
+            mcycles = cpu->execute(halt_cpu);
+        }
+        mmio->incr_timers(mcycles);
 
     }
 }

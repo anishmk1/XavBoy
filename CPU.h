@@ -72,7 +72,7 @@ public:
     RegFile rf;
 
     CPU (Memory *mem);
-    void execute(bool& halt_cpu);
+    int execute(bool& halt_cpu);
 
 private:
     InterruptInfo intrpt_info;
@@ -82,7 +82,7 @@ private:
     bool sub_borrowFromBitX(int bit,  uint16_t A=0, uint16_t b=0, uint16_t c=0);
     void compute_flags_add8(int a, int b, ExcludeFlags ex = ExcludeFlags());
     void compute_flags_sub8(int a, int b, ExcludeFlags ex = ExcludeFlags());
-    bool get_block2_3_operand(uint8_t cmd, uint8_t &operand);
+    bool get_block2_3_operand(uint8_t cmd, uint8_t &operand, int &mcycles);
     void pop_r16_stack(r16_index_t r16);
     void push_val_stack(uint16_t val);
     bool handle_interrupts();
