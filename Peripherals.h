@@ -8,7 +8,7 @@ class Memory;
 
 class MMIO {
 
-    uint16_t system_counter;
+    uint16_t system_counter;        // Increments once per m-cycle
     
 public:
     bool IME = 0;                   // Interrupt Master Enable
@@ -18,8 +18,11 @@ public:
 
     void set_ime();
     void clear_ime();
+    void reset_ime();
     void incr_timers(int mcycles);
-    bool check_interrupts(uint16_t &intr_handler_addr);
+    // bool exit_halt_mode(uint16_t &intr_handler_addr);
+    bool exit_halt_mode();
+    bool check_interrupts(uint16_t &intr_handler_addr, bool cpu_halted);
     uint8_t access(int addr, bool read_nwr, uint8_t val=0);
 
     MMIO(Memory *memory);

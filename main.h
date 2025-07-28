@@ -4,8 +4,12 @@
 
 #include "Debug.h"
 
+#include <chrono>
+#include <thread>
+
 
 extern std::ofstream logFile;
+extern std::ofstream debug_file;
 extern bool verbose;
 extern bool disable_prints;
 extern bool DEBUGGER;

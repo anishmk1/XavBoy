@@ -23,6 +23,7 @@
 
 Debug *dbg;
 std::ofstream logFile;
+std::ofstream debug_file;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
@@ -30,6 +31,8 @@ bool PRINT_REGS_EN = true;
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
+
+const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
 
 
 uint8_t *open_rom(const char* file_path, size_t *file_size) {
@@ -70,6 +73,28 @@ void setup_serial_output() {
 }
 
 
+// Wait for some real world duration equivalent to the specified number 
+// of machine cycles at the given clock frequency (Hz)
+void wait_cycles(int mcycles, double clock_frequency_hz) {
+    // Each machine cycle = 4 clock cycles
+    const int clocks_per_mcycle = 4;
+
+    // Total clock cycles
+    double total_clocks = mcycles * clocks_per_mcycle;
+
+    // Duration of one clock cycle (in seconds)
+    double seconds_per_cycle = 1.0 / clock_frequency_hz;
+
+    // Total duration to wait (in seconds)
+    double wait_time_seconds = total_clocks * seconds_per_cycle;
+
+    // Convert to chrono duration
+    auto wait_duration = std::chrono::duration<double>(wait_time_seconds);
+
+    std::this_thread::sleep_for(wait_duration);
+}
+
+
 //------------------------------------------//
 //      Emulate the CPU for the Gameboy     //
 //------------------------------------------//
@@ -86,6 +111,8 @@ int main(int argc, char* argv[]) {
     }
 
     setup_serial_output();
+    // Separate debug log file
+    debug_file.open("debug.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
@@ -127,7 +154,15 @@ int main(int argc, char* argv[]) {
 
     // ----------------------------------- DEBUG ROMS -----------------------------------------------
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_2_debug.gb", &file_size);
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb", &file_size);
+
+    // Note: To produce Debug roms (With .sym dbeugger symbols)
+    //      cd XavBoy/test-roms/gb-test-roms/cpu_instrs/source
+    //      wla-gb -D DEBUG -o ../../../blarggs-debug-roms/test.o 02-interrupts.s
+    //      cd ../../../blarggs-debug-roms
+    //      wlalink -S -v ../gb-test-roms/cpu_instrs/source/linkfile cpu_instrs_2_debug.gb
+
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
@@ -138,17 +173,58 @@ int main(int argc, char* argv[]) {
         perror("Error unmapping file");
     }
 
-    bool halt_cpu = false;      // From CPU when HALT instruction executed
+    // bool halt_cpu = false;      // From CPU when HALT instruction executed
     print ("Starting main loop\n\n");
     
     while (true) {  // main loop
-        if (DEBUGGER) dbg->debugger_break(*cpu);
+        cpu->rf.debug0 = mem->mmio->IME;
+        cpu->rf.debug1 = mem->mmio->IME_ff[0];
+        cpu->rf.debug2 = mem->mmio->IME_ff[1];
+        dbg->debugger_break(*cpu);
 
-        int mcycles;
-        if (!halt_cpu) {
-            mcycles = cpu->execute(halt_cpu);
+
+        // Jul 25th Debug Notes
+        // Line 151347 ---> Some general TIMER interrupt testing. Passed this initially but code re-org brought it back
+        // Line 152036 ---> HALT instr happens around here. Need to confirm cpu is able to wake back up
+        // 
+        // make is not terminating - most probs because TIMA is not incrementing
+        // TAC is never enabled. SO thtas why
+        // According to source file, TAC should be enabled for interrupt_addr@set_test 4
+        // But on enabling compile with symbols, the resultant PC addr for this doesnt actually have the instructions
+        // that are supposed to be there at interrupt_addr@set_test 4
+        // Maybe need some sanity testing on the symbols...
+
+
+
+
+        int mcycles = 1;
+        if (!cpu->halt_mode) {
+            mcycles = cpu->execute();
+            assert(GAMEBOY_CPU_FREQ_HZ);
+            // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
         mmio->incr_timers(mcycles);
+
+        // IE && IF != 0 wakes up CPU from halt mode
+        if (cpu->halt_mode) {
+
+            if (mmio->exit_halt_mode()) {
+                cpu->halt_mode = false;
+            }
+
+            // More Interrupt handling - this time when handling halted Cpu
+            cpu->rf.debug0 = mem->mmio->IME;
+            if (mmio->check_interrupts(cpu->intrpt_info.handler_addr, 1)) {
+                cpu->intrpt_info.interrupt_valid = true;
+                cpu->intrpt_info.wait_cycles = 1;
+            }
+        }
+        
+        // if (halt_cpu && mmio->exit_halt_mode(cpu->intrpt_info.handler_addr)) {
+        //     halt_cpu = false;
+        //     cpu->intrpt_info.interrupt_valid = true;
+        //     cpu->intrpt_info.wait_cycles = 0;
+        // }
 
     }
 }

@@ -12,12 +12,19 @@ typedef struct {
     bool disable_breakpoints;
 } BreakpointInfo;
 
+typedef struct {
+    uint16_t pc;
+    bool valid;
+} TargetPC;
+
 class Debug {
 public:
     long free_clk;
     long num_steps_left;
     bool run;
     uint8_t tgt_instr;
+    // uint8_t tgt_pc;
+    TargetPC tgt_pc;
     BreakpointInfo bp_info;
 
     bool disable_interrupts = false;

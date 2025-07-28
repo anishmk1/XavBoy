@@ -12,6 +12,7 @@ Debug::Debug() {
     free_clk = 0;
     num_steps_left = 0;
     run = false;
+    tgt_pc.valid = 0;
     tgt_instr = 0xd3;   // Init to some illegal value that I would never target
     bp_info.breakpoint = false;
     bp_info.disable_breakpoints = false;
@@ -57,6 +58,14 @@ void Debug::debugger_break(CPU &cpu) {
             break_execution = false;
         }
     }
+    if (tgt_pc.valid) {
+        if (cpu.rf.get(PC) == tgt_pc.pc) {
+            break_execution = true;
+            tgt_pc.valid = true;
+        } else {
+            break_execution = false;
+        }
+    }
     // If breakpoint is triggered in code, break execution (priority = 1)
     if (!bp_info.disable_breakpoints && bp_info.breakpoint) {
         printx ("Hit breakpoint! \"%s\"\n", bp_info.msg.c_str());
@@ -64,7 +73,10 @@ void Debug::debugger_break(CPU &cpu) {
         bp_info.breakpoint = false;
         num_steps_left = 0;
         tgt_instr = 0xd3;
+        tgt_pc.valid = false;
     }
+
+    if (DEBUGGER == false) break_execution = false;
 
     // Break CPU execution for debugging
     if (break_execution) {
@@ -84,12 +96,16 @@ void Debug::debugger_break(CPU &cpu) {
                 
                 if (dbg_cmd.size() > 1) {
                     if (dbg_cmd[1] == 'i') {
-                        // step to instruction:
+                        // step to next occurence of instruction:
                         tgt_instr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
                     } else if (dbg_cmd[1] == 't') {
                         // Step to right before line number xxxx
                         int step_input = std::stoi(dbg_cmd.substr(2));
                         num_steps_left = step_input - free_clk - 1;
+                    } else if (dbg_cmd[1] == 'p' && dbg_cmd[2] == 'c') {
+                        // Step to PC == 0x____
+                        tgt_pc.pc = std::stoi(dbg_cmd.substr(3), nullptr, 16);
+                        tgt_pc.valid = true;
                     } else {
                         // Step xxxx lines
                         int step_input = std::stoi(dbg_cmd.substr(1));

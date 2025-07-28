@@ -19,7 +19,11 @@
 #include "Memory.h"
 #include "Peripherals.h"
 
-constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
+constexpr uint8_t VBLANK_BIT    = 1 << 0;  // Bit 0
+constexpr uint8_t LCD_BIT       = 1 << 1;  // Bit 1  (aka STAT Interrupt)
+constexpr uint8_t TIMER_BIT     = 1 << 2;  // Bit 2
+constexpr uint8_t SERIAL_BIT    = 1 << 3;  // Bit 3
+constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
 
 // class Memory;
@@ -99,18 +103,33 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
         this->IME = 0;
     }
 
+    void MMIO::reset_ime() {
+        IME = 0;
+        IME_ff[0] = 0;
+        IME_ff[1] = 0;    
+    }
+
     void MMIO::incr_timers(int mcycles) {
 
         // system_counter += mcycles;       // This should happen once every M-cycle
+        // if (mcycles != 0 ) {
+        //     debug_file << "incr_timers; mcycles=" << mcycles << "; clk num: " << dbg->free_clk << std::endl;
+        // } else {
+        //     debug_file << "TEST incr_timers with mcycles == 0" << std::endl;
+        // }
         
 
         for (int i = 0; i < mcycles; i++) {
             system_counter++;
-            if (system_counter == (2^14)) system_counter = 0;       // system_counter should actually only be 14 bits. This models that
+            if (system_counter == (1 << 14)) {
+                // debug_file << "system counter overflowing; clk num: " << dbg->free_clk << std::endl;
+                system_counter = 0;       // system_counter should actually only be 14 bits. This models that
+            }
 
 
             if ((mem[TAC] >> 2) & 0b1) {   // Only increment TIMA if TAC Enable set
                 print ("Inside if statement\n");
+                debug_file << "TAC enable is set; clk num: " << dbg->free_clk << std::endl;
                 int tac_select = (mem[TAC]) & 0b11;
                 int incr_count = 0;
                 switch (tac_select) {
@@ -133,9 +152,12 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
                         std::exit(EXIT_FAILURE);
                         break;
                 }
+                // debug_file << "TEST Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
+                // debug_file.flush();
 
                 if (system_counter % incr_count == 0) {   // Increment TIMA
                 // if (free_clk % incr_count == 0) {   // Increment TIMA        // GET FREE CLK FROM MAIN.CPP
+                    debug_file << "Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
                     mem[TIMA]++;
                     if (mem[TIMA] == 0) {
                         mem[TIMA] = mem[TMA]; // When the value overflows (exceeds $FF) it is reset to the value specified in TMA (FF06) and an interrupt is requested
@@ -143,6 +165,9 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
 
                     }
                 }
+            } else {
+                // debug_file << "TAC select: 0x" << std::hex << mem[TAC] << std::endl;
+                // printx ("TAC select : 0x%0x\n", mem[TAC]);
             }
 
 
@@ -170,36 +195,72 @@ constexpr uint8_t TIMER_BIT = 1 << 2;  // Bit 2
         IME_ff[1] = IME_ff[0];
     }
 
-    bool MMIO::check_interrupts(uint16_t &intr_handler_addr) {
-        // if (dbg->free_clk == 151382) dbg->disable_interrupts = true;    // FIXME: get rid of this line
-        if (dbg->disable_interrupts) return false;
-        // return false;
-
-        if (IME) {
-            // FIXME: change this to do [IE] & [IF] and process the result based on interrupt priotity
-            // Use the TIMER_BIT etc to parse the result
-            // FIXME: ONly checking timer interrupt for now
-            if ((mem[IE] & TIMER_BIT) && (mem[IF] & TIMER_BIT)) {
-                // print ("mem[IE]=0x%0x; mem[IF]=0x%0x\n", mem[IE], mem[IF]);
-                // print ("mem[IE] & TIMER_BIT =0x%0x; mem[IF] & TIMER_BIT =0x%0x\n", mem[IE] & TIMER_BIT, mem[IF] & TIMER_BIT);
-                print ("Detected TIMER Interrupt\n");
-                intr_handler_addr = 0x50;
-                mem[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
-
-                IME = 0;    // Reset IME
-                IME_ff[0] = 0;
-                IME_ff[1] = 0;
-
-                // dbg->breakpoint = true;
-                dbg->bp_info.breakpoint = true;
-                dbg->bp_info.msg = "Hit TIMER Interrupt";
-                return true;
-            }
-        }
-
-        return false;
+    bool MMIO::exit_halt_mode() {
+        if (mem[IF] & mem[IE]) return true;
+        else return false;
     }
 
 
+    bool MMIO::check_interrupts(uint16_t &intr_handler_addr, bool cpu_halted) {
+        // if (dbg->free_clk == 151382) dbg->disable_interrupts = true;
+        if (dbg->disable_interrupts) return false;
+        // return false;
+        bool intr_triggered = false;
 
-// };
+        uint8_t ie_and_if = mem[IF] & mem[IE];
+        if (ie_and_if) {
+            // WAKE CPU
+            if (IME) {
+                // setup interrupt handler for execution
+                if (ie_and_if & VBLANK_BIT) {
+                    reset_ime();
+                    intr_handler_addr = 0x40;
+                    mem[IF] &= ~VBLANK_BIT;  // Clear IF VBLANK Bit
+                    intr_triggered = true;
+                } else if (ie_and_if & LCD_BIT) {
+                    reset_ime();
+                    intr_handler_addr = 0x48;
+                    mem[IF] &= ~LCD_BIT;  // Clear IF LCD/STAT Bit
+                    intr_triggered = true;
+                } else if (ie_and_if & TIMER_BIT) {
+                    // dbg->bp_info.breakpoint = true;
+                    // dbg->bp_info.msg = "Hit TIMER Interrupt";
+                    reset_ime();
+                    intr_handler_addr = 0x50;
+                    mem[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
+                    intr_triggered = true;
+
+                } else if (ie_and_if & SERIAL_BIT) {
+                    reset_ime();
+                    intr_handler_addr = 0x58;
+                    mem[IF] &= ~SERIAL_BIT;  // Clear IF Serial Bit
+                    intr_triggered = true;
+
+                } else if (ie_and_if & JOYPAD_BIT) {
+                    reset_ime();
+                    intr_handler_addr = 0x60;
+                    mem[IF] &= ~JOYPAD_BIT;  // Clear IF Joypad Bit
+                    intr_triggered = true;
+                }
+
+                // TODO: maybe add intr handler addrs to a dictionary and replace this
+                // code with a loop?
+                // for (int i = 0; i < 4; i++) {
+                //     if (ie_and_if & (1 << i)) { 
+
+                //         break;
+                //     }
+                // }
+
+            } else {
+                if (cpu_halted) {
+                    // can do further processing of the "2 distinct cases"
+                }
+                // else (i.e IME not set but regular execution of CPU, do nothing)
+            }
+        }
+
+        if (intr_triggered) return false;
+
+        return false;
+    }

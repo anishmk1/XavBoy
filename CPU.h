@@ -32,6 +32,9 @@ union Reg {
     } flags;
 };
 
+/*
+    For communicating between mmio and CPU
+*/
 typedef struct {
     bool interrupt_valid;
     uint16_t handler_addr;
@@ -71,11 +74,15 @@ public:
     Memory *mem;
     RegFile rf;
 
+    InterruptInfo intrpt_info;      // FIXME: This should be in private
+
+    bool halt_mode;
+    bool stop_mode;
+
     CPU (Memory *mem);
-    int execute(bool& halt_cpu);
+    int execute();
 
 private:
-    InterruptInfo intrpt_info;
 
     bool match(uint8_t cmd, const char *compare);
     bool add16_overflowFromBitX(int bit, uint16_t a=0, uint16_t b=0, uint16_t c=0);

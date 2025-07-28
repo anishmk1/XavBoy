@@ -230,7 +230,7 @@
     /**
      * Return: number of M-Cycles taken
      */
-    int CPU::execute(bool& halt_cpu) {
+    int CPU::execute() {
         bool nop = false;
         uint8_t cmd;
         int mcycles = 1;
@@ -485,9 +485,9 @@
         /////////////////////
         else if (match(cmd, "01xxxxxx")) {                  // ld r8, r8
             if (match(cmd, "01110110")) {
-                printx ("    detected: HALT");
+                print ("    detected: HALT");
                 // HALT => Wait for interrupt (clks keep running)
-                halt_cpu = true;
+                this->halt_mode = true;
             } else {
                 print("    detected: ld r8, r8 ----");
                 int regd_bits = ((cmd >> 3) & 0b111);
@@ -597,6 +597,9 @@
 
             if (rf.check_cc(cc)) {
                 pop_r16_stack(PC);      // ret ~= POP PC (Move PC to return address:head of stack; then incr stack pointer to "pop")
+                mcycles = 5;
+            } else {
+                mcycles = 2;
             }
         } else if (match(cmd, "11001001")) {                // ret
             print ("    detected: ret\n");
@@ -607,12 +610,14 @@
             // printx ("around 0x00cd\n");
             // mem->dump_mem(0x00cd);
             pop_r16_stack(PC);      // ret ~= POP PC (Move PC to return address:head of stack; then incr stack pointer to "pop")
+            mcycles = 4;
         } else if (match(cmd, "11011001")) {                // reti
             print ("    detected: reti\n");
 
             pop_r16_stack(PC);
             mem->mmio->set_ime();    // Enable Interrupts next cycle
 
+            mcycles = 4;
         } else if (match(cmd, "110xx010")) {                // jp cond, imm16
             print ("    detected: jp cond, imm16\n");
             cc_t cc = static_cast<cc_t>((cmd >> 3) & 0b11);
@@ -620,16 +625,20 @@
             if (rf.check_cc(cc)) {
                 uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
                 rf.set(PC, imm16);
+                mcycles = 4;
             } else {
                 rf.regs[PC].val += 2;
+                mcycles = 3;
             }
         } else if (match(cmd, "11000011")) {                // jp imm16
             print ("    detected: jp cond, imm16\n");
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);    // little endian imm16
             rf.set(PC, imm16);
+            mcycles = 4;
         } else if (match(cmd, "11101001")) {                // jp hl
             print ("    detected: jp hl\n");
             rf.set(PC, rf.get(HL));
+            mcycles = 1;
         } else if (match(cmd, "110xx100")) {                // call cond, imm16
             print ("    detected: call cond, imm16\n");
 
@@ -642,6 +651,9 @@
 
                 push_val_stack(return_addr);
                 rf.set(PC, imm16);
+                mcycles = 6;
+            } else {
+                mcycles = 3;
             }
         } else if (match(cmd, "11001101")) {                // call imm16
             print ("    detected: call imm16\n");
@@ -656,6 +668,7 @@
 
             push_val_stack(return_addr);
             rf.set(PC, imm16);
+            mcycles = 6;
 
         } else if (match(cmd, "11xxx111")) {                // rst tgt3
             print ("    detected: rst tgt3\n");
@@ -665,12 +678,14 @@
             push_val_stack(return_addr);
 
             rf.set(PC, target_addr);
+            mcycles = 4;
         } else if (match(cmd, "11xx0001")) {                // pop r16stk
             print ("    detected: pop r16stk\n");
 
             r16_index_t r16stk = RegFile::get_r16stk(((cmd >> 4) & 0b11));
             pop_r16_stack(r16stk);
 
+            mcycles = 3;
         } else if (match(cmd, "11xx0101")) {                // push r16stk
             print ("    detected: push r16stk ---");
 
@@ -678,6 +693,7 @@
             uint16_t val = rf.get(r16stk);
             push_val_stack(val);
 
+            mcycles = 4;
             print (" r16stk=%0d; val=0x%0x; SP=0x%0x\n", r16stk, val, rf.get(SP));
         } 
         
@@ -692,6 +708,7 @@
 
             uint8_t cb_op = mem->get(rf.get(PC));
             r8_index_t r8 = RegFile::get_r8(cb_op & 0b111);
+
 
             if (match(cb_op, "00000xxx")) {         // rlc r8
                 print("    detected: rlc r8\n");
@@ -1025,7 +1042,8 @@
     // bool CPU::check_and_handle_interrupts() {
     bool CPU::set_new_interrupts() {
 
-        if (mem->mmio->check_interrupts(intrpt_info.handler_addr)) {
+        print ("Inside set_new_interrupts; clk num %0ld\n", dbg->free_clk);
+        if (mem->mmio->check_interrupts(intrpt_info.handler_addr, 0)) {
             // 1. Two wait states are executed (2 M-cycles pass 
             //     while nothing happens; 
             //     presumably the CPU is executing nops during this time).
@@ -1033,6 +1051,7 @@
             // MISSING ^^
             // cpu_nops = 2;
 
+            print ("check_interrupts returned TRUE; clk num %0ld\n", dbg->free_clk);
             intrpt_info.interrupt_valid = true;
             intrpt_info.wait_cycles = 0;
             return true;
