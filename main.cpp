@@ -124,7 +124,7 @@ int main(int argc, char* argv[]) {
      
     
     //  1 - PASSED
-    //  2 - hanging...
+    //  2 - PASSED
     //  3 - PASSED
     //  4 - PASSED
     //  5 - PASSED
