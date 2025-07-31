@@ -1,6 +1,5 @@
 Serial Output Window....
 
-02-interrupts
+cpu_instrs
 
-
-Passed
+01:ok  02:ok  03
