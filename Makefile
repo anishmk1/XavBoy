@@ -2,23 +2,20 @@ ROM ?= prog_OR.hex
 
 CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
-SRC = main.cpp
 
-# all: clean main.out 
-# 	@./main.out
 all: clean link
 	@./myprogram
 
 compile:
-	@g++ -Wall -Wextra -std=c++17 -c Memory.cpp -o Memory.out
-	@g++ -Wall -Wextra -std=c++17 -c CPU.cpp -o CPU.out
-	@g++ -Wall -Wextra -std=c++17 -c Peripherals.cpp -o Peripherals.out
-	@g++ -Wall -Wextra -std=c++17 -c Debug.cpp -o Debug.out
-	@g++ -Wall -Wextra -std=c++17 -c main.cpp -o main.out
+	@g++ -Wall -Wextra -std=c++17 -c src/Memory.cpp -o bin/Memory.out
+	@g++ -Wall -Wextra -std=c++17 -c src/CPU.cpp -o bin/CPU.out
+	@g++ -Wall -Wextra -std=c++17 -c src/Peripherals.cpp -o bin/Peripherals.out
+	@g++ -Wall -Wextra -std=c++17 -c src/Debug.cpp -o bin/Debug.out
+	@g++ -Wall -Wextra -std=c++17 -c src/main.cpp -o bin/main.out
 
 
 link: compile 
-	@g++ main.out Memory.out CPU.out Peripherals.out Debug.out -o myprogram
+	@g++ bin/main.out bin/Memory.out bin/CPU.out bin/Peripherals.out bin/Debug.out -o myprogram
 
 compile_rom:
 	python3 xav_compiler.py test-roms/$(ROM)

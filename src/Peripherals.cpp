@@ -129,7 +129,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
             if ((mem[TAC] >> 2) & 0b1) {   // Only increment TIMA if TAC Enable set
                 print ("Inside if statement\n");
-                debug_file << "TAC enable is set; clk num: " << dbg->free_clk << std::endl;
+                // debug_file << "TAC enable is set; clk num: " << dbg->free_clk << std::endl;
                 int tac_select = (mem[TAC]) & 0b11;
                 int incr_count = 0;
                 switch (tac_select) {
@@ -157,7 +157,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
                 if (system_counter % incr_count == 0) {   // Increment TIMA
                 // if (free_clk % incr_count == 0) {   // Increment TIMA        // GET FREE CLK FROM MAIN.CPP
-                    debug_file << "Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
+                    // debug_file << "Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
                     mem[TIMA]++;
                     if (mem[TIMA] == 0) {
                         mem[TIMA] = mem[TMA]; // When the value overflows (exceeds $FF) it is reset to the value specified in TMA (FF06) and an interrupt is requested

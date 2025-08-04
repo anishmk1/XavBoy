@@ -66,7 +66,7 @@ uint8_t *open_rom(const char* file_path, size_t *file_size) {
 }
 
 void setup_serial_output() {
-    logFile.open("log.txt");
+    logFile.open("./logs/log.txt");
     std::clog.rdbuf(logFile.rdbuf());  // Redirect clog to file
 
     std::clog << "Serial Output Window....\n\n";
@@ -112,7 +112,7 @@ int main(int argc, char* argv[]) {
 
     setup_serial_output();
     // Separate debug log file
-    debug_file.open("debug.log");
+    debug_file.open("logs/debug.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
@@ -139,8 +139,8 @@ int main(int argc, char* argv[]) {
     size_t file_size;
     uint8_t *rom_ptr;
     // ------------------------------- BLARGG'S TEST ROMS -------------------------------------------
-    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb", &file_size);
+    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);

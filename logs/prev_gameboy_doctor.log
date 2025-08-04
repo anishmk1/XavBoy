@@ -1,0 +1,17 @@
+============== ERROR ==============
+
+Mismatch in CPU state at line 151347:
+
+MINE:	[32mA:05[0m [32mF:C---[0m [32mB:01[0m C:00 D:C7 E:BA H:90 L:00 [32mSP:DFFB[0m [32mPC:0051[0m [32mPCMEM:C9,00,00,00[0m
+YOURS:	[31mA:04[0m [31mF:C-NZ[0m [31mB:00[0m C:00 D:C7 E:BA H:90 L:00 [31mSP:DFFD[0m [31mPC:C2C1[0m [31mPCMEM:C2,B9,C1,F8[0m
+
+The CPU state before this (at line 151346) was:
+
+	A:04 F:10 B:01 C:00 D:C7 E:BA H:90 L:00 SP:DFFD PC:C2C0 PCMEM:05,C2,B9,C1
+
+The last operation executed (in between lines 151346 and 151347) was:
+
+	0x05 DEC B
+
+Perhaps the problem is with this opcode, or with your interrupt handling?
+
