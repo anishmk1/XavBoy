@@ -243,10 +243,10 @@
 
         // Process NEW state.....
         // check for infinite loop
-        if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
-            print ("Detected Infinite loop. Exiting sim\n");
-            std::exit(EXIT_SUCCESS);
-        }
+        // if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
+        //     // print ("Detected Infinite loop. Exiting sim\n");
+        //     // std::exit(EXIT_SUCCESS);
+        // }
 
         // Interrupt handling
         rf.debug0 = mem->mmio->IME;

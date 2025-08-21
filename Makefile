@@ -13,6 +13,9 @@ compile:
 	@g++ -Wall -Wextra -std=c++17 -c src/Debug.cpp -o bin/Debug.out
 	@g++ -Wall -Wextra -std=c++17 -c src/main.cpp -o bin/main.out
 
+app:
+	g++ src/App.cpp -o bin/App.out -L /opt/homebrew/opt/sdl2/lib -I /opt/homebrew/opt/sdl2/include -lSDL2
+	./bin/App.out
 
 link: compile 
 	@g++ bin/main.out bin/Memory.out bin/CPU.out bin/Peripherals.out bin/Debug.out -o myprogram

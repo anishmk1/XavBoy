@@ -11,8 +11,8 @@ class FIFO {
 public:
     Pixel pixels[FIFO_DEPTH];
 
-    void push(int num);
-    int pop();
+    void push(Pixel num);
+    Pixel pop();
 };
 
 class PPU {

@@ -3,6 +3,7 @@
 
 //---------------------------------
 //  Compile with:
+//      make app:
 //      g++ src/App.cpp -o bin/App.out -L /opt/homebrew/opt/sdl2/lib -I /opt/homebrew/opt/sdl2/include -lSDL2
 //---------------------------------
 
@@ -17,10 +18,10 @@ int main(int argc, char* argv[]) {
 
     // Create a window
     SDL_Window* window = SDL_CreateWindow(
-        "My SDL2 Window",              // Title
+        "XavBoy",                      // Title
         SDL_WINDOWPOS_CENTERED,        // X position
         SDL_WINDOWPOS_CENTERED,        // Y position
-        800, 600,                      // Width, Height
+        1000, 900,                     // Width, Height
         SDL_WINDOW_SHOWN               // Flags
     );
 

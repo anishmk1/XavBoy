@@ -140,7 +140,7 @@ int main(int argc, char* argv[]) {
     uint8_t *rom_ptr;
     // ------------------------------- BLARGG'S TEST ROMS -------------------------------------------
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb", &file_size);
-    rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
     // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
@@ -157,6 +157,9 @@ int main(int argc, char* argv[]) {
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb", &file_size);
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_2_debug.gb", &file_size);
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb", &file_size);
+
+    // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
+    rom_ptr = open_rom("test-roms/graphics-test-roms/simple_infinite_loop.gb", &file_size);
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
     //      cd XavBoy/test-roms/gb-test-roms/cpu_instrs/source
@@ -176,6 +179,7 @@ int main(int argc, char* argv[]) {
 
     // bool halt_cpu = false;      // From CPU when HALT instruction executed
     print ("Starting main loop\n\n");
+    debug_file << "Starting main loop" << std::endl;
     
     while (true) {  // main loop
         cpu->rf.debug0 = mem->mmio->IME;

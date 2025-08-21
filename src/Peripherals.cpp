@@ -48,24 +48,6 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
         system_counter = 0;
     }
 
-    // void init_mmio(std::vector<uint8_t>& mem){
-    //     print ("init_mmio done\n");
-    //     this->mmio = &mem[0xFF00];
-    // }
-
-    // bool write(int addr, uint8_t val) {
-    //     if (mmio.find(addr) != mmio.end()) {
-    //         if (addr == DIV) {
-    //             mmio[DIV] = 0;  // Writing any value to DIV resets it to 0
-    //         } else {
-    //             mmio[addr] = val;
-    //         }
-    //         return true;
-    //     } else {
-    //         return false;
-    //     }
-    // }
-
     uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val) {
         if (read_nwr) {
             // ----------------- //
@@ -90,10 +72,6 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             return 0;
         }
     }
-
-    // uint8_t read(int addr) {
-    //     return mmio.at(addr);
-    // }
 
     void MMIO::set_ime() {
         this->IME_ff[0] = 1;
@@ -157,7 +135,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
                 if (system_counter % incr_count == 0) {   // Increment TIMA
                 // if (free_clk % incr_count == 0) {   // Increment TIMA        // GET FREE CLK FROM MAIN.CPP
-                    // debug_file << "Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
+                    debug_file << "Incremented TIMA; clk num: " << dbg->free_clk << std::endl;
                     mem[TIMA]++;
                     if (mem[TIMA] == 0) {
                         mem[TIMA] = mem[TMA]; // When the value overflows (exceeds $FF) it is reset to the value specified in TMA (FF06) and an interrupt is requested
@@ -216,6 +194,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
         if (ie_and_if) {
             print("check_interrupts: At least one interrupt is pending and enabled\n");
+            debug_file << "Inside ie_and_if" << std::endl; 
             // WAKE CPU
             if (IME) {
                 print("check_interrupts: IME is set, checking which interrupt to trigger\n");
@@ -226,6 +205,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x40;
                     mem[IF] &= ~VBLANK_BIT;  // Clear IF VBLANK Bit
                     intr_triggered = true;
+                    debug_file << "Triggering VBLANK interrupt @ clk num = " << dbg->free_clk << std::endl; 
                 } else if (ie_and_if & LCD_BIT) {
                     print("check_interrupts: Triggering LCD/STAT interrupt\n");
                     reset_ime();
@@ -238,6 +218,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x50;
                     mem[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
                     intr_triggered = true;
+                    debug_file << "Triggering TIMER interrupt @ clk num = " << dbg->free_clk << std::endl; 
                 } else if (ie_and_if & SERIAL_BIT) {
                     print("check_interrupts: Triggering SERIAL interrupt\n");
                     reset_ime();
