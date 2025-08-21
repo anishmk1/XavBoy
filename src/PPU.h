@@ -1,3 +1,7 @@
+// PPU.h
+#ifndef PPU_H
+#define PPU_H
+
 #define FIFO_DEPTH 16
 
 typedef struct {
@@ -18,4 +22,7 @@ public:
 class PPU {
 public:
     int mode;   // 0 - HBLANK; 1 - VBLANK; 2 - OAM SCAN; 3 - DRAW PIXELS
+    uint8_t reg_access(int addr, bool read_nwr, uint8_t val);
 };
+
+#endif

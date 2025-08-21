@@ -6,6 +6,8 @@ CXXFLAGS = -Wall -Wextra -std=c++17
 all: clean link
 	@./myprogram
 
+build: clean link
+
 compile:
 	@g++ -Wall -Wextra -std=c++17 -c src/Memory.cpp -o bin/Memory.out
 	@g++ -Wall -Wextra -std=c++17 -c src/CPU.cpp -o bin/CPU.out

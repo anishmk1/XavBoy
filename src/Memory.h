@@ -10,8 +10,8 @@ class Memory {
     size_t romSize;
 
 public:
-    std::vector<uint8_t> mem;
-    MMIO *mmio;
+    std::vector<uint8_t> memory;
+    // MMIO *mmio;
 
     Memory();
     uint8_t access_memory_map(int addr, uint8_t val, bool read_nwr);

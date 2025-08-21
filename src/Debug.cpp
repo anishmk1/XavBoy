@@ -9,7 +9,7 @@
 
 
 Debug::Debug() {
-    free_clk = 0;
+    instr_cnt = 0;
     num_steps_left = 0;
     run = false;
     tgt_pc.valid = 0;
@@ -36,7 +36,7 @@ void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
 // Can also use the vars to interract with the program automatically
 // num_steps_left, breakpoint, run, clk_cnt, tg_instr etc etc
 void Debug::debugger_break(CPU &cpu) {
-    free_clk++;
+    instr_cnt++;
 
     bool exit_debugger = false;
     bool break_execution = true;
@@ -101,7 +101,7 @@ void Debug::debugger_break(CPU &cpu) {
                     } else if (dbg_cmd[1] == 't') {
                         // Step to right before line number xxxx
                         int step_input = std::stoi(dbg_cmd.substr(2));
-                        num_steps_left = step_input - free_clk - 1;
+                        num_steps_left = step_input - instr_cnt - 1;
                     } else if (dbg_cmd[1] == 'p' && dbg_cmd[2] == 'c') {
                         // Step to PC == 0x____
                         tgt_pc.pc = std::stoi(dbg_cmd.substr(3), nullptr, 16);
@@ -154,7 +154,7 @@ void Debug::debugger_break(CPU &cpu) {
                 run = true;
             } else if (dbg_cmd[0] == 'l') {
                 // Line Count
-                printx("clock/step count = %lu\n", free_clk);
+                printx("Instr count = %lu\n", instr_cnt);
             }
             
         } while (exit_debugger == false);

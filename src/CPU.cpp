@@ -243,13 +243,13 @@
 
         // Process NEW state.....
         // check for infinite loop
-        // if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
-        //     // print ("Detected Infinite loop. Exiting sim\n");
-        //     // std::exit(EXIT_SUCCESS);
-        // }
+        if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
+            print ("Detected Infinite loop. Exiting sim\n");
+            std::exit(EXIT_SUCCESS);
+        }
 
         // Interrupt handling
-        rf.debug0 = mem->mmio->IME;
+        rf.debug0 = mmio->IME;
         set_new_interrupts();
         if (handle_interrupts()) {
             // if (intrpt_info.wait_cycles > 0) return;
@@ -615,7 +615,7 @@
             print ("    detected: reti\n");
 
             pop_r16_stack(PC);
-            mem->mmio->set_ime();    // Enable Interrupts next cycle
+            mmio->set_ime();    // Enable Interrupts next cycle
 
             mcycles = 4;
         } else if (match(cmd, "110xx010")) {                // jp cond, imm16
@@ -877,11 +877,11 @@
         } else if (match(cmd, "11110011")) {                // di
             print ("    detected: di\n");
 
-            mem->mmio->clear_ime();
+            mmio->clear_ime();
         } else if (match(cmd, "11111011")) {                // ei
             print ("    detected: ei\n");
 
-            mem->mmio->set_ime();
+            mmio->set_ime();
         } 
 
         else {
@@ -1042,8 +1042,8 @@
     // bool CPU::check_and_handle_interrupts() {
     bool CPU::set_new_interrupts() {
 
-        print ("Inside set_new_interrupts; clk num %0ld\n", dbg->free_clk);
-        if (mem->mmio->check_interrupts(intrpt_info.handler_addr, 0)) {
+        print ("Inside set_new_interrupts; clk num %0ld\n", dbg->instr_cnt);
+        if (mmio->check_interrupts(intrpt_info.handler_addr, 0)) {
             // 1. Two wait states are executed (2 M-cycles pass 
             //     while nothing happens; 
             //     presumably the CPU is executing nops during this time).
@@ -1051,7 +1051,7 @@
             // MISSING ^^
             // cpu_nops = 2;
 
-            print ("check_interrupts returned TRUE; clk num %0ld\n", dbg->free_clk);
+            print ("check_interrupts returned TRUE; clk num %0ld\n", dbg->instr_cnt);
             intrpt_info.interrupt_valid = true;
             intrpt_info.wait_cycles = 0;
             return true;

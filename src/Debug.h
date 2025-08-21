@@ -19,7 +19,9 @@ typedef struct {
 
 class Debug {
 public:
-    long free_clk;
+    // long free_clk;
+    long instr_cnt;
+    long mcycle_cnt;
     long num_steps_left;
     bool run;
     uint8_t tgt_instr;

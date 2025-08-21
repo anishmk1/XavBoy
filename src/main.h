@@ -3,6 +3,9 @@
 #define MAIN_H
 
 #include "Debug.h"
+#include "PPU.h"
+#include "Memory.h"
+#include "Peripherals.h"
 
 #include <chrono>
 #include <thread>
@@ -18,6 +21,9 @@ extern const bool LOAD_BOOT_ROM;    // default: true; ROM includes bytes from ad
 extern const bool SKIP_BOOT_ROM;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 extern const bool GAMEBOY_DOCTOR;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
+extern PPU *ppu;        // Globally referencable PPU module
+extern Memory *mem;      // Globally referencable Memory 
+extern MMIO *mmio;
 extern Debug *dbg;      // Reference to Debug module should be visible from everywhere
 
 #define printx(...)                            \

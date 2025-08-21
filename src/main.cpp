@@ -19,9 +19,13 @@
 #include "Peripherals.h"
 #include "Memory.h"
 #include "CPU.h"
+#include "PPU.h"
 #include "Debug.h"
 
 Debug *dbg;
+Memory *mem;
+PPU *ppu;
+MMIO *mmio;
 std::ofstream logFile;
 std::ofstream debug_file;
 bool verbose = false;
@@ -100,15 +104,15 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
 //------------------------------------------//
 int main(int argc, char* argv[]) {
     // char* gb_file = "test-roms/prog_OR.gb";
-    if (argc != 1 && argc != 2) {
-        std::cerr << "Error opening the file!" << std::endl;
-        return 1;
-    }
-    if (argc == 2) {
-        DEBUGGER = (strcmp(argv[1], "--debug") == 0);
-        PRINT_REGS_EN = (strcmp(argv[1], "--quiet") != 0);
-        // gb_file = argv[1];
-    }
+    // if (argc != 1 && argc != 2) {
+    //     std::cerr << "Error opening the file!" << std::endl;
+    //     return 1;
+    // }
+    // if (argc == 2) {
+    //     DEBUGGER = (strcmp(argv[1], "--debug") == 0);
+    //     PRINT_REGS_EN = (strcmp(argv[1], "--quiet") != 0);
+    //     // gb_file = argv[1];
+    // }
 
     setup_serial_output();
     // Separate debug log file
@@ -116,9 +120,12 @@ int main(int argc, char* argv[]) {
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
-    Memory *mem = new Memory();
-    MMIO *mmio  = new MMIO(mem);
+    // Memory *mem = new Memory();
+    // MMIO *mmio  = new MMIO(mem);
+    mem = new Memory();
+    mmio  = new MMIO();
     CPU *cpu    = new CPU(mem);
+    ppu = new PPU();
     dbg = new Debug();
 
      
@@ -159,13 +166,34 @@ int main(int argc, char* argv[]) {
     // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb", &file_size);
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
-    rom_ptr = open_rom("test-roms/graphics-test-roms/simple_infinite_loop.gb", &file_size);
+    // rom_ptr = open_rom("test-roms/graphics-test-roms/simple_infinite_loop.gb", &file_size);
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
     //      cd XavBoy/test-roms/gb-test-roms/cpu_instrs/source
     //      wla-gb -D DEBUG -o ../../../blarggs-debug-roms/test.o 02-interrupts.s
     //      cd ../../../blarggs-debug-roms
     //      wlalink -S -v ../gb-test-roms/cpu_instrs/source/linkfile cpu_instrs_2_debug.gb
+
+    // Use ROM path and flags from command line if provided, otherwise use default
+    std::string rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
+    
+    // std::string rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
+    // std::cerr << "argc = " << argc << std::endl;
+    for (int i = 1; i < argc; ++i) {
+        // printx ("From main.cpp: Currently looking at argv[%0d] = %s\n", i, argv[i]);
+        // std::cerr << "From main.cpp: Currently looking at argv[" << i << "] = " << argv[i] << std::endl;
+        if (strcmp(argv[i], "--debug") == 0) {
+            DEBUGGER = true;
+        } else if (strcmp(argv[i], "--quiet") == 0) {
+            PRINT_REGS_EN = false;
+        } else if (argv[i][0] != '-') {
+            rom_path = std::string(argv[i]);
+            // printx ("From main.cpp: rom_path = %s\n", rom_path.c_str());
+            // std::cerr << "From main.cpp: rom_path = " << rom_path << std::endl;
+        }
+    }
+    // std::cerr << "Trying to open ROM: " << rom_path << std::endl;
+    rom_ptr = open_rom(rom_path.c_str(), &file_size);
 
     if (rom_ptr == nullptr) {
         std::cerr << "Error opening the file!" << std::endl;
@@ -182,9 +210,9 @@ int main(int argc, char* argv[]) {
     debug_file << "Starting main loop" << std::endl;
     
     while (true) {  // main loop
-        cpu->rf.debug0 = mem->mmio->IME;
-        cpu->rf.debug1 = mem->mmio->IME_ff[0];
-        cpu->rf.debug2 = mem->mmio->IME_ff[1];
+        cpu->rf.debug0 = mmio->IME;
+        cpu->rf.debug1 = mmio->IME_ff[0];
+        cpu->rf.debug2 = mmio->IME_ff[1];
         dbg->debugger_break(*cpu);
 
 
@@ -218,7 +246,7 @@ int main(int argc, char* argv[]) {
             }
 
             // More Interrupt handling - this time when handling halted Cpu
-            cpu->rf.debug0 = mem->mmio->IME;
+            cpu->rf.debug0 = mmio->IME;
             if (mmio->check_interrupts(cpu->intrpt_info.handler_addr, 1)) {
                 cpu->intrpt_info.interrupt_valid = true;
                 cpu->intrpt_info.wait_cycles = 1;
