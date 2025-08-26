@@ -8,7 +8,7 @@ RESET = "\033[0m"
 
 # List of BLARGG'S TEST ROMS (update as needed)
 roms = [
-    # "test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb",
+    # "test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb",    # FIXME: requires MBC banking because it's too big to fit at once in the RAM
     "test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb",
     "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb",
     "test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb",
@@ -56,8 +56,11 @@ print("\nTest Results:")
 for rom, status in results.items():
     if status == "PASSED":
         color = GREEN
-    elif status == "FAILED":
-        color = RED
     else:
-        color = RESET
+        color = RED
+    
+    # elif status == "FAILED":
+    #     color = RED
+    # else:
+    #     color = RESET
     print(f"{rom}: {color}{status}{RESET}")

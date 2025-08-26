@@ -1,6 +1,6 @@
 Serial Output Window....
 
-11-op a,(hl)
+04-op r,imm
 
 
 Passed

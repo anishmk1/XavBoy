@@ -103,6 +103,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
         memory[0xFFFF] = 0x00; // IE
     }
 
+    // FIXME:: when LCD is ON and PPU is actively drawing (aka not HBLANK or VBLANK) cpu should not be able to access VRAM or OAM. And vice versa (i think)
     uint8_t Memory::access_memory_map(int addr, uint8_t val, bool read_nwr) {
         if (addr < 0) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
@@ -140,6 +141,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
                 return 0;
             }
         } else if (addr <= 0xFE9F) {          // Object attribute memory (OAM)
+            // Consists of 40 entries - each 4 bytes
             if (read_nwr) return memory[addr];
             else {
                 memory[addr] = val;
@@ -156,14 +158,14 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
             }
         } else if (addr <= 0xFF7F) {          // I/O Registers
             // FIXME: Maybe change this so it's just all done in Memory block? Not sure the clean way to do this...
-            // if (addr <= 0xFF3F) {
-            //     return mmio->access(addr, read_nwr, val);
-            // } else if (addr <= 0xFF48) {            // LCD Registers
-            //     return ppu->reg_access(addr, read_nwr, val);
-            // } else {
-            //     return mmio->access(addr, read_nwr, val);
-            // }
-            return mmio->access(addr, read_nwr, val);
+            if (addr <= 0xFF3F) {
+                return mmio->access(addr, read_nwr, val);
+            } else if (addr <= 0xFF48) {            // LCD Registers
+                return ppu->reg_access(addr, read_nwr, val);
+            } else {
+                return mmio->access(addr, read_nwr, val);
+            }
+            // return mmio->access(addr, read_nwr, val);
 
         } else if (addr <= 0xFFFE) {          // High RAM (HRAM)
             if (read_nwr) return memory[addr];

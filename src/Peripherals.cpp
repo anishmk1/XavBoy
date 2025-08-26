@@ -41,14 +41,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
     const uint16_t IE = 0xffFF;     // Interrupt enable -- 0xFFFF
     const uint16_t IF = 0xff0F;     // Interrupt flag   -- 0xFF0F
 
-    // MMIO::MMIO (Memory *memory)
-    //     : mem(memory->mem) {
-    //     // this->mem = memory->mem;    // Will be overridden in Memory()
-    //     memory->mmio = this;
-    //     system_counter = 0;
-    // }
     MMIO::MMIO () {
-        // mem->mmio = this;
         system_counter = 0;
     }
 
@@ -57,12 +50,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             // ----------------- //
             //    READ ACCESS    //
             // ----------------- //
-            if (addr == 0xff44) {
-                return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
-            } else {
-                return mem->memory[addr];
-            }
-            // return mem->memory[addr - 0xff00];
+            return mem->memory[addr];
         } else {
             // ----------------- //
             //    WRITE ACCESS   //
@@ -72,7 +60,6 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             } else {
                 mem->memory[addr] = val;
             }
-            // mem->memory[addr - 0xff00] = val;
             return 0;
         }
     }

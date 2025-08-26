@@ -103,16 +103,6 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
 //      Emulate the CPU for the Gameboy     //
 //------------------------------------------//
 int main(int argc, char* argv[]) {
-    // char* gb_file = "test-roms/prog_OR.gb";
-    // if (argc != 1 && argc != 2) {
-    //     std::cerr << "Error opening the file!" << std::endl;
-    //     return 1;
-    // }
-    // if (argc == 2) {
-    //     DEBUGGER = (strcmp(argv[1], "--debug") == 0);
-    //     PRINT_REGS_EN = (strcmp(argv[1], "--quiet") != 0);
-    //     // gb_file = argv[1];
-    // }
 
     setup_serial_output();
     // Separate debug log file
@@ -120,16 +110,13 @@ int main(int argc, char* argv[]) {
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
-    // Memory *mem = new Memory();
-    // MMIO *mmio  = new MMIO(mem);
-    mem = new Memory();
-    mmio  = new MMIO();
+    mem         = new Memory();     // FIXME: Change "mem" reference to "mmu". Then memory field can be renamed back to "mem"
+    mmio        = new MMIO();
     CPU *cpu    = new CPU(mem);
-    ppu = new PPU();
-    dbg = new Debug();
+    ppu         = new PPU();
+    dbg         = new Debug();
 
      
-    
     //  1 - PASSED
     //  2 - PASSED
     //  3 - PASSED
@@ -143,56 +130,59 @@ int main(int argc, char* argv[]) {
     // 11 - PASSED
 
 
+    /**
+     *  TODO: Try to implement the solid color screen using the program chatgpt gave
+     *      1. Implement FF47 Register functionality - BG palette data 
+     *      2. Implement LCD control register - LCD enable/ BG enable
+     *      3.  
+     */
+
+
+
+
+
     size_t file_size;
     uint8_t *rom_ptr;
+    std::string rom_path;
+    // Use ROM path and flags from command line if provided, otherwise use default
     // ------------------------------- BLARGG'S TEST ROMS -------------------------------------------
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/05-op rp.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/06-ld r,r.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/08-misc instrs.gb", &file_size);
-    // rom_ptr = open_rom("./test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/10-bit ops.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb", &file_size);
-    // rom_ptr = open_rom("./test-roms/test.gb", &file_size);
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/cpu_instrs.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb";
+    rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/05-op rp.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/06-ld r,r.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/08-misc instrs.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/09-op r,r.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/10-bit ops.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb";
+    // rom_path = "test-roms/test.gb";
 
     // ----------------------------------- DEBUG ROMS -----------------------------------------------
-    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_2_debug.gb", &file_size);
-    // rom_ptr = open_rom("test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb", &file_size);
+    // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb";
+    // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_2_debug.gb";
+    // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb";
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
-    // rom_ptr = open_rom("test-roms/graphics-test-roms/simple_infinite_loop.gb", &file_size);
+    // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
     //      cd XavBoy/test-roms/gb-test-roms/cpu_instrs/source
     //      wla-gb -D DEBUG -o ../../../blarggs-debug-roms/test.o 02-interrupts.s
     //      cd ../../../blarggs-debug-roms
     //      wlalink -S -v ../gb-test-roms/cpu_instrs/source/linkfile cpu_instrs_2_debug.gb
-
-    // Use ROM path and flags from command line if provided, otherwise use default
-    std::string rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
     
-    // std::string rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
-    // std::cerr << "argc = " << argc << std::endl;
     for (int i = 1; i < argc; ++i) {
-        // printx ("From main.cpp: Currently looking at argv[%0d] = %s\n", i, argv[i]);
-        // std::cerr << "From main.cpp: Currently looking at argv[" << i << "] = " << argv[i] << std::endl;
         if (strcmp(argv[i], "--debug") == 0) {
             DEBUGGER = true;
         } else if (strcmp(argv[i], "--quiet") == 0) {
             PRINT_REGS_EN = false;
         } else if (argv[i][0] != '-') {
             rom_path = std::string(argv[i]);
-            // printx ("From main.cpp: rom_path = %s\n", rom_path.c_str());
-            // std::cerr << "From main.cpp: rom_path = " << rom_path << std::endl;
         }
     }
-    // std::cerr << "Trying to open ROM: " << rom_path << std::endl;
     rom_ptr = open_rom(rom_path.c_str(), &file_size);
 
     if (rom_ptr == nullptr) {
@@ -236,6 +226,7 @@ int main(int argc, char* argv[]) {
             assert(GAMEBOY_CPU_FREQ_HZ);
             // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
+        ppu->ppu_tick();
         mmio->incr_timers(mcycles);
 
         // IE && IF != 0 wakes up CPU from halt mode
