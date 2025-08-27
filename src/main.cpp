@@ -100,23 +100,13 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
 
 
 //------------------------------------------//
-//      Emulate the CPU for the Gameboy     //
+//            Emulate the Gameboy           //
 //------------------------------------------//
-int main(int argc, char* argv[]) {
-
+int emulate(int argc, char* argv[]) {
     setup_serial_output();
-    // Separate debug log file
-    debug_file.open("logs/debug.log");
 
-    // FIXME: Confirm that this automatically frees memory when program finishes
-    // use valgrind etc
-    mem         = new Memory();     // FIXME: Change "mem" reference to "mmu". Then memory field can be renamed back to "mem"
-    mmio        = new MMIO();
     CPU *cpu    = new CPU(mem);
-    ppu         = new PPU();
-    dbg         = new Debug();
 
-     
     //  1 - PASSED
     //  2 - PASSED
     //  3 - PASSED
@@ -251,4 +241,33 @@ int main(int argc, char* argv[]) {
         // }
 
     }
+}
+
+int main(int argc, char* argv[]) {
+
+    // setup_serial_output();
+    // Separate debug log file
+    debug_file.open("logs/debug.log");
+
+    // FIXME: Confirm that this automatically frees memory when program finishes
+    // use valgrind etc
+    mem         = new Memory();     // FIXME: Change "mem" reference to "mmu". Then memory field can be renamed back to "mem"
+    mmio        = new MMIO();
+    // CPU *cpu    = new CPU(mem);
+    ppu         = new PPU();
+    dbg         = new Debug();
+
+    bool test_ppu = false;
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--test_ppu") == 0) {
+            test_ppu = true;
+        }
+    }
+
+    if (test_ppu) {
+        ppu->test_ppu();
+    } else {
+        emulate(argc, argv);
+    }
+     
 }

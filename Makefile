@@ -16,24 +16,37 @@ compile:
 	@g++ -Wall -Wextra -std=c++17 -c src/Debug.cpp -o bin/Debug.out
 	@g++ -Wall -Wextra -std=c++17 -c src/main.cpp -o bin/main.out
 
-app:
-	g++ src/App.cpp -o bin/App.out -L /opt/homebrew/opt/sdl2/lib -I /opt/homebrew/opt/sdl2/include -lSDL2
-	./bin/App.out
-
 link: compile 
 	@g++ bin/main.out bin/Memory.out bin/CPU.out bin/PPU.out bin/Peripherals.out bin/Debug.out -o myprogram
-
-compile_rom:
-	python3 xav_compiler.py test-roms/$(ROM)
-
-test:
-	python3 cpu_instrs_sanity_test.py
 
 debug: clean link 
 	./myprogram --debug
 
 quiet: clean link
 	./myprogram --quiet
+
+test:
+	python3 cpu_instrs_sanity_test.py
+
+
+
+
+# Run SDL Window
+app:
+	g++ src/App.cpp -o bin/App.out -L /opt/homebrew/opt/sdl2/lib -I /opt/homebrew/opt/sdl2/include -lSDL2
+	./bin/App.out
+
+# Test PPU - probably need to merge with app rule
+ppu: clean link
+	./myprogram --test_ppu
+
+
+
+
+
+ # PROBABLY NOT NEEDED ANYMORE...
+compile_rom:
+	python3 xav_compiler.py test-roms/$(ROM)
 
 clean:
 	@rm -f *.out myprogram
