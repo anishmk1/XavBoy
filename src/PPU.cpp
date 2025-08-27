@@ -65,9 +65,13 @@ Pixel FIFO::pop() {
 //     }
 // }
 
+PPU::PPU() {
+    this->mode = PPUMode::VBLANK;     // PPU should start in this mode once LCD Enabled
+}
 
 
-uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val) {
+
+uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     if (read_nwr) {         // Read
 //     return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
         return mem->memory[addr];
@@ -79,8 +83,10 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val) {
                     std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
             }
         } else if (addr == REG_LY) {
-            print ("Attempted write to LY reg [read-only]; Dropping write\n");
-            return 0;
+            if (!backdoor) {
+                print ("Attempted write to LY reg [read-only]; Dropping write\n");
+                return 0;
+            }
         }
 
         mem->memory[addr] = val;
@@ -127,32 +133,8 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val) {
   *     So what is the 
   */
 
-
-
-
-// Single mcycle of the PPU
-void PPU::ppu_tick(){
-    if (mem->memory[REG_LCDC] & LCDC_ENABLE_BIT == 0) return;
-
-    static int mcycle_cnt = 0;     // initialized once, persists across calls
-    static int dot_cnt    = 0;     // initialized once, persists across calls
-
-    
+void PPU::draw_pixels() {
     // BEGIN SCANLINE
-    // mem->memory[REG_LY]
-    this->mode = PPUMode::OAM_SCAN;     // Stay in this mode for 80 dots (=4 m-cycles)
-    if (dot_cnt == 1) {
-
-    }
-    // Loop through OAM memory and populate first 10 objects
-    // that are visible on this scanline (Y coord)
-    // oam_scan();
-    // for (int i = 0; i < 40; i++) {
-        // TODO: implement this... Ignore object fetching for now until we get blank background
-
-        
-    // }
-
     std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     uint8_t ly = mem->get(REG_LY);
@@ -183,19 +165,88 @@ void PPU::ppu_tick(){
             Pixel pxl;
             pxl.color = static_cast<Color>((color_palette >> (2*color_id)) & 0b11);
 
-            pixel_fifo.push(pxl);   // FIXME: Is the ordering of this correct? It's technically pushing in 0th Pixel first.
+            pixel_fifo.push(pxl);   // Note: Is the ordering of this correct? It's technically pushing in 0th Pixel first.
         }
+    }
+}
+
+
+
+
+// Tick mcycles of the PPU
+void PPU::ppu_tick(int mcycles){
+    if (mem->memory[REG_LCDC] & LCDC_ENABLE_BIT == 0) return;
+
+    static int mcycle_cnt = 0;     // initialized once, persists across calls
+    static int dot_cnt    = 0;     // initialized once, persists across calls
+
+    if (dbg->mcycle_cnt >= 20000000) {
+        print ("Run for enough time. Exit\n");
+        std::exit(EXIT_SUCCESS);
     }
 
     
-
-
-    mcycle_cnt++;
+    mcycle_cnt += mcycles;
     if (mcycle_cnt >= 4) {
-        mcycle_cnt = 0;
+        // debug_file << "Detected DOT" << std::endl;
+        mcycle_cnt %= 4;
 
         // Detected DOT
         dot_cnt++;
+        // if (dot_cnt)
+
+        uint8_t curr_LY = mem->get(REG_LY);
+
+        // ------------------- //
+        //  PPU state machine  //
+        // ------------------- //
+        switch (this->mode) {
+            case PPUMode::OAM_SCAN:
+                if (dot_cnt == 80) {    // Note - 80 might be off by 1..
+                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl;
+                    this->mode = PPUMode::DRAW_PIXELS;
+                    // Loop through OAM memory and populate first 10 objects
+                    // that are visible on this scanline (Y coord)
+                    // oam_scan();
+                }
+                break;
+            
+            case PPUMode::DRAW_PIXELS:
+                if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
+                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Time to draw pixels @ mcycle = " << dbg->mcycle_cnt << std::endl;
+
+                    draw_pixels();
+
+                    uint8_t new_LY = curr_LY + 1;
+                    mem->set(REG_LY, new_LY, 1);
+                    dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
+                    // FIXME: pretending HBLANK doesnt exist for now..
+                    if (new_LY == 144) {
+                        this->mode = PPUMode::VBLANK;
+                    } else {
+                        this->mode = PPUMode::OAM_SCAN;
+                    }
+                }
+                break;
+            
+            case PPUMode::VBLANK:
+                if (dot_cnt == 456) {
+                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
+                    uint8_t new_LY = curr_LY + 1;
+                    if (new_LY == 155) {
+                        debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl;
+                        new_LY = 0;
+                        this->mode = PPUMode::OAM_SCAN;
+                    }
+
+                    mem->set(REG_LY, new_LY, 1);
+                    dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
+                }
+                break;
+
+            default:
+                break;
+        }
     }
 }
 

@@ -216,7 +216,7 @@ int emulate(int argc, char* argv[]) {
             assert(GAMEBOY_CPU_FREQ_HZ);
             // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
-        ppu->ppu_tick();
+        ppu->ppu_tick(mcycles);
         mmio->incr_timers(mcycles);
 
         // IE && IF != 0 wakes up CPU from halt mode

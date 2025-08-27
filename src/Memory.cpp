@@ -104,7 +104,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
     }
 
     // FIXME:: when LCD is ON and PPU is actively drawing (aka not HBLANK or VBLANK) cpu should not be able to access VRAM or OAM. And vice versa (i think)
-    uint8_t Memory::access_memory_map(int addr, uint8_t val, bool read_nwr) {
+    uint8_t Memory::access_memory_map(int addr, uint8_t val, bool read_nwr, bool backdoor) {
         if (addr < 0) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return 1;
@@ -161,7 +161,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
             if (addr <= 0xFF3F) {
                 return mmio->access(addr, read_nwr, val);
             } else if (addr <= 0xFF48) {            // LCD Registers
-                return ppu->reg_access(addr, read_nwr, val);
+                return ppu->reg_access(addr, read_nwr, val, backdoor);
             } else {
                 return mmio->access(addr, read_nwr, val);
             }
@@ -185,7 +185,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
         }
     }
 
-    int Memory::set(int addr, uint8_t val) {
+    int Memory::set(int addr, uint8_t val, bool backdoor) {
         // if (addr == 0xff0f) {
         //     dbg->bp_info.breakpoint = true;
         //     dbg->bp_info.msg = "Setting memory addr 0xff0f";
@@ -200,7 +200,7 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
         // }
 
 
-        return access_memory_map(addr, val, 0);
+        return access_memory_map(addr, val, 0, backdoor);
     }
 
     uint8_t Memory::get(int addr) {
