@@ -35,40 +35,33 @@ constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 1 << 0;   // Bit 0   BG & Window 
 
 
 
-void FIFO::push(Pixel num) {
+bool FIFO::push(Pixel pxl) {
+    if (size < 16) {
+        pixels[FIFO_DEPTH - 1 - size] = pxl;
+        size++;
+        return true; // Push successful
+    }
 
+    return false;   // Push unsuccessful
 }
 
 Pixel FIFO::pop() {
+    Pixel pxl = pixels[FIFO_DEPTH-1];
+    for (int i = 1; i < FIFO_DEPTH; i++) {
+        pixels[i] = pixels[i-1];
+    }
+    // ZERO out pixels[0]
+    pixels[0] = Pixel{};
+    size--;
 
+    assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
+    return pxl;
 }
 
-
-// Tile::Tile(std::array<uint8_t, 16>& tile_data) {
-//     // Construct a 2D array of Pixels based on the Tile Data Format
-//     for (int i = 0; i < 8; i++) {   // For each row
-//         for (int j = 0; j < 8; j++) {
-
-//             // LSBs of the Color IDs come from the 1st Byte
-//             uint8_t lsb_byte = tile_data[2*i]; // tile_data[i + (j/4)];
-//             int color_id_lsb = (lsb_byte >> (7-j)) & 0b1;
-//             uint8_t msb_byte = tile_data[2*i + 1];
-//             int color_id_msb = (msb_byte >> (7-j)) & 0b1;
-//             int color_id = color_id_lsb + (color_id_msb << 1);
-
-//             // Using the color id, get the actual color by indexing into the palette
-//             Pixel p;
-//             uint8_t color_palette = mem->get(REG_BGP);
-//             p.color = static_cast<Color>((color_palette >> (2*color_id)) & 0b11);
-//             pixel_grid[i][j] = p;
-//         }
-//     }
-// }
 
 PPU::PPU() {
     this->mode = PPUMode::VBLANK;     // PPU should start in this mode once LCD Enabled
 }
-
 
 
 uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
@@ -77,8 +70,8 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
         return mem->memory[addr];
     } else {                // Write
         if (addr == REG_LCDC) {
-            if ((mem->memory[addr] & LCDC_ENABLE_BIT == 1) &&
-                (val & LCDC_ENABLE_BIT == 0) &&
+            if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
+                ((val & LCDC_ENABLE_BIT) == 0) &&
                 (this->mode != PPUMode::VBLANK)) {
                     std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
             }
@@ -170,20 +163,65 @@ void PPU::draw_pixels() {
     }
 }
 
+/**
+ * Given a pixel x coordinate - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
+ */
+void PPU::fetch_pixel(int pixel_x) {
+    if (pixel_x >= 160) return;     // Note: This is not needed once HBLANK is implemented
+
+
+    std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
+    // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
+    uint8_t ly = mem->get(REG_LY);
+    uint8_t color_palette = mem->get(REG_BGP);
+
+    int tile_x = pixel_x / 8;
+
+    // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
+    uint16_t tile_id_addr = 0x9800 + tile_x + (0 /*scanline 0 times number of X indices in a scanline*/);
+    uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
+
+    // Then fetch what that tile looks like from Memory.
+    // Get the 16 byte data (each pixel is 2 bits. 8x8 = 64 pixels => 128 bits => 128/8 = 16 bytes)
+    uint16_t tile_data_addr = 0x9000 + (tile_id * 16);       // 0x9000 = base addr for VRAM Tile Data for (BG/WIN when LCDC.4 is 0 and Using unsigned tile addressign mode)
+    for (int i = 0; i < 16; i++) {
+        // Populating each byte of tile data
+        tile_data[i] = mem->get(tile_data_addr);
+    }
+
+    // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
+    int tile_local_y = ly % 8;      // ly is y coord across all tiles - what is the y relative to the current tile?
+    uint8_t lsb_byte = tile_data[2*tile_local_y];
+    uint8_t msb_byte = tile_data[2*tile_local_y + 1];
+
+    int pixel_local_x = pixel_x % 8;
+    int color_id_lsb = (lsb_byte >> (7 - pixel_local_x)) & 0b1;
+    int color_id_msb = (msb_byte >> (7 - pixel_local_x)) & 0b1;
+    int color_id = color_id_lsb + (color_id_msb << 1);
+
+    Pixel pxl;
+    pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+
+    pixel_fifo.push(pxl);
+
+}
+
 
 
 
 // Tick mcycles of the PPU
 void PPU::ppu_tick(int mcycles){
-    if (mem->memory[REG_LCDC] & LCDC_ENABLE_BIT == 0) return;
+    if ((mem->memory[REG_LCDC] & LCDC_ENABLE_BIT) == 0) return;
 
     static int mcycle_cnt = 0;     // initialized once, persists across calls
     static int dot_cnt    = 0;     // initialized once, persists across calls
 
+    // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if (dbg->mcycle_cnt >= 20000000) {
         print ("Run for enough time. Exit\n");
         std::exit(EXIT_SUCCESS);
     }
+    // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     
     mcycle_cnt += mcycles;
@@ -201,7 +239,7 @@ void PPU::ppu_tick(int mcycles){
         //  PPU state machine  //
         // ------------------- //
         switch (this->mode) {
-            case PPUMode::OAM_SCAN:
+            case PPUMode::OAM_SCAN: {
                 if (dot_cnt == 80) {    // Note - 80 might be off by 1..
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl;
                     this->mode = PPUMode::DRAW_PIXELS;
@@ -210,12 +248,17 @@ void PPU::ppu_tick(int mcycles){
                     // oam_scan();
                 }
                 break;
-            
-            case PPUMode::DRAW_PIXELS:
-                if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
-                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Time to draw pixels @ mcycle = " << dbg->mcycle_cnt << std::endl;
+            }
 
-                    draw_pixels();
+            case PPUMode::DRAW_PIXELS: {
+
+                int pixel_x = (dot_cnt - 81);
+                fetch_pixel(pixel_x);
+                
+                if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
+                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Moving on to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
+
+                    // draw_pixels();
 
                     uint8_t new_LY = curr_LY + 1;
                     mem->set(REG_LY, new_LY, 1);
@@ -228,8 +271,9 @@ void PPU::ppu_tick(int mcycles){
                     }
                 }
                 break;
-            
-            case PPUMode::VBLANK:
+            }
+
+            case PPUMode::VBLANK: {
                 if (dot_cnt == 456) {
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
                     uint8_t new_LY = curr_LY + 1;
@@ -243,6 +287,7 @@ void PPU::ppu_tick(int mcycles){
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
                 }
                 break;
+            }
 
             default:
                 break;

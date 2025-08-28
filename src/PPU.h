@@ -30,20 +30,16 @@ typedef struct {
     int palette;            // on DMG this only applies to objects
     // int sprite_priority;    // on DMG this doesn’t exist
     int bg_priority;        // holds the value of the OBJ-to-BG Priority bit
+    bool valid;
 } Pixel;
 
-// class Tile {
-// public:
-//     Pixel pixel_grid[8][8]; // [row][column]
-
-//     Tile(std::array<uint8_t, 16>& tile_data);
-// };
 
 class FIFO {
 public:
-    Pixel pixels[FIFO_DEPTH];
+    Pixel pixels[FIFO_DEPTH];   // -----> [0 1 2 ... 15] ----->
+    int size;
 
-    void push(Pixel num);
+    bool push(Pixel pxl);
     Pixel pop();
 };
 
@@ -54,6 +50,7 @@ public:
     void ppu_tick(int mcycles);
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
+    void fetch_pixel(int pixel_x);
 
     PPU();
     void test_ppu();

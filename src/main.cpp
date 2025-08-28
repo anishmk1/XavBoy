@@ -26,6 +26,7 @@ Debug *dbg;
 Memory *mem;
 PPU *ppu;
 MMIO *mmio;
+LCD *lcd;
 std::ofstream logFile;
 std::ofstream debug_file;
 bool verbose = false;
@@ -256,6 +257,9 @@ int main(int argc, char* argv[]) {
     // CPU *cpu    = new CPU(mem);
     ppu         = new PPU();
     dbg         = new Debug();
+    lcd         = new LCD();
+
+    // lcd->init_screen();
 
     bool test_ppu = false;
     for (int i = 1; i < argc; ++i) {

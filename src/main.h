@@ -6,6 +6,7 @@
 #include "PPU.h"
 #include "Memory.h"
 #include "Peripherals.h"
+#include "LCD.h"
 
 #include <chrono>
 #include <thread>
@@ -25,6 +26,7 @@ extern PPU *ppu;        // Globally referencable PPU module
 extern Memory *mem;      // Globally referencable Memory 
 extern MMIO *mmio;
 extern Debug *dbg;      // Reference to Debug module should be visible from everywhere
+extern LCD *lcd;
 
 #define printx(...)                            \
     do {                                       \
