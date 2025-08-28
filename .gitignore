@@ -30,6 +30,10 @@
 *.exe
 *.out
 *.app
+myprogram
 
 # Folders
 test-roms/gb-test-roms/
+gameboy-doctor/
+logs/
+
