@@ -44,13 +44,15 @@ public:
 };
 
 class PPU {
-public:
     FIFO pixel_fifo;
+
+public:
     PPUMode mode;   // 0 - HBLANK; 1 - VBLANK; 2 - OAM SCAN; 3 - DRAW PIXELS
     void ppu_tick(int mcycles);
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
     void fetch_pixel(int pixel_x);
+    void pop_pixel_fifo(Pixel (&pixels)[8]);
 
     PPU();
     void test_ppu();

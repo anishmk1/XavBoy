@@ -87,6 +87,12 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     }
 }
 
+void PPU::pop_pixel_fifo(Pixel (&pixels)[8]) {
+    for (int i = 0; i < 8; i++) {
+        pixels[i] = pixel_fifo.pop();
+    }
+}
+
 
 /**
  * 
@@ -258,11 +264,11 @@ void PPU::ppu_tick(int mcycles){
                 if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Moving on to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
 
-                    // draw_pixels();
-
                     uint8_t new_LY = curr_LY + 1;
                     mem->set(REG_LY, new_LY, 1);
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
+                    // lcd->write_to_framebuffer(); -------- NEED TO ENABLE THIS HERE
+
                     // FIXME: pretending HBLANK doesnt exist for now..
                     if (new_LY == 144) {
                         this->mode = PPUMode::VBLANK;
@@ -274,7 +280,11 @@ void PPU::ppu_tick(int mcycles){
             }
 
             case PPUMode::VBLANK: {
-                if (dot_cnt == 456) {
+                if (dot_cnt == 1) {
+                    // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
+                    lcd->frame_ready = true;
+                    lcd->test_write_to_fb();
+                } else if (dot_cnt == 456) {
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
                     uint8_t new_LY = curr_LY + 1;
                     if (new_LY == 155) {
@@ -293,14 +303,4 @@ void PPU::ppu_tick(int mcycles){
                 break;
         }
     }
-}
-
-
-
-
-
-void PPU::test_ppu() {
-    printx ("Testing PPU\n");
-
-    
 }

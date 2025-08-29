@@ -15,6 +15,8 @@
 #include <cassert>
 #include <set>
 
+#include <SDL2/SDL.h>
+
 #include "main.h"
 #include "Peripherals.h"
 #include "Memory.h"
@@ -121,17 +123,6 @@ int emulate(int argc, char* argv[]) {
     // 11 - PASSED
 
 
-    /**
-     *  TODO: Try to implement the solid color screen using the program chatgpt gave
-     *      1. Implement FF47 Register functionality - BG palette data 
-     *      2. Implement LCD control register - LCD enable/ BG enable
-     *      3.  
-     */
-
-
-
-
-
     size_t file_size;
     uint8_t *rom_ptr;
     std::string rom_path;
@@ -141,7 +132,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/01-special.gb";
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/02-interrupts.gb";
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/03-op sp,hl.gb";
-    rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb";
+    // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/04-op r,imm.gb";
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/05-op rp.gb";
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/06-ld r,r.gb";
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/07-jr,jp,call,ret,rst.gb";
@@ -157,6 +148,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb";
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
+    rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -190,25 +182,29 @@ int emulate(int argc, char* argv[]) {
     print ("Starting main loop\n\n");
     debug_file << "Starting main loop" << std::endl;
     
-    while (true) {  // main loop
+    SDL_Event event;
+    bool main_loop_running = true;
+    while (main_loop_running) {  // main loop
+        // Poll for events
+        // SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
+        // Loop exits once all events are popped off the q
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+                main_loop_running = false; // Window closed
+
+                lcd->close_window();
+            }
+        }
+
+        if (lcd->frame_ready) {
+            lcd->draw_frame();
+        }
+
+
         cpu->rf.debug0 = mmio->IME;
         cpu->rf.debug1 = mmio->IME_ff[0];
         cpu->rf.debug2 = mmio->IME_ff[1];
         dbg->debugger_break(*cpu);
-
-
-        // Jul 25th Debug Notes
-        // Line 151347 ---> Some general TIMER interrupt testing. Passed this initially but code re-org brought it back
-        // Line 152036 ---> HALT instr happens around here. Need to confirm cpu is able to wake back up
-        // 
-        // make is not terminating - most probs because TIMA is not incrementing
-        // TAC is never enabled. SO thtas why
-        // According to source file, TAC should be enabled for interrupt_addr@set_test 4
-        // But on enabling compile with symbols, the resultant PC addr for this doesnt actually have the instructions
-        // that are supposed to be there at interrupt_addr@set_test 4
-        // Maybe need some sanity testing on the symbols...
-
-
 
 
         int mcycles = 1;
@@ -242,6 +238,8 @@ int emulate(int argc, char* argv[]) {
         // }
 
     }
+
+    return 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -259,19 +257,7 @@ int main(int argc, char* argv[]) {
     dbg         = new Debug();
     lcd         = new LCD();
 
-    // lcd->init_screen();
-
-    bool test_ppu = false;
-    for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--test_ppu") == 0) {
-            test_ppu = true;
-        }
-    }
-
-    if (test_ppu) {
-        ppu->test_ppu();
-    } else {
-        emulate(argc, argv);
-    }
+    lcd->init_screen();
      
+    emulate(argc, argv);
 }

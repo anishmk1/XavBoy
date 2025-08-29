@@ -1,3 +1,8 @@
+; Compile with RGBASM
+; rgbasm -o blank_screen.obj blank_screen.asm
+; rgblink -o blank_screen.gb blank_screen.obj
+; rgbfix -v -p 0 blank_screen.gb
+
 ; Minimal GB ROM: turns on LCD and shows a solid black screen
 
 SECTION "Header", ROM0[$0100]
@@ -10,7 +15,8 @@ Start:
     ; Bit pairs (from LSB): Color 0,1,2,3 → hardware shades
     ; $FF = 11 11 11 11b = all shades mapped to black
     ; $55 = 01 01 01 01b = all shades mapped to light grey
-    ld   a, $55
+    ; $00 = 00 00 00 00b = all shades mapped to white
+    ld   a, $00
     ld   [$FF47], a
 
     ; Turn on LCD (LCDC, 0xFF40)
