@@ -20,7 +20,7 @@ void LCD::test_write_to_fb() {
 
 void LCD::write_to_framebuffer() {
     Pixel pixels[8];
-    ppu->pop_pixel_fifo(pixels);
+    // ppu->pop_pixel_fifo(pixels);
 
     for (int i = 0; i < 8; i++) {
         Pixel pxl = pixels[8];

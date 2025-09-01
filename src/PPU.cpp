@@ -87,11 +87,11 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     }
 }
 
-void PPU::pop_pixel_fifo(Pixel (&pixels)[8]) {
-    for (int i = 0; i < 8; i++) {
-        pixels[i] = pixel_fifo.pop();
-    }
+void PPU::pop_pixel_fifo(Pixel& pxl) {
+    pxl = pixel_fifo.pop();
 }
+
+
 
 
 /**
@@ -267,7 +267,9 @@ void PPU::ppu_tick(int mcycles){
                     uint8_t new_LY = curr_LY + 1;
                     mem->set(REG_LY, new_LY, 1);
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
-                    // lcd->write_to_framebuffer(); -------- NEED TO ENABLE THIS HERE
+
+                    // lcd->update_framebuffer_ptrs(curr_LY, );
+                    // lcd->write_to_framebuffer();
 
                     // FIXME: pretending HBLANK doesnt exist for now..
                     if (new_LY == 144) {

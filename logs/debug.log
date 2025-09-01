@@ -1,2 +1,10 @@
 Starting main loop
 [LY = 145] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 1823
+[LY = 146] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 3647
+[LY = 147] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 5471
+[LY = 148] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 7295
+[LY = 149] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 9119
+[LY = 150] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 10943
+[LY = 151] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 12767
+[LY = 152] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 14591
+[LY = 153] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = 16415

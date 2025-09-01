@@ -52,7 +52,7 @@ public:
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
     void fetch_pixel(int pixel_x);
-    void pop_pixel_fifo(Pixel (&pixels)[8]);
+    void pop_pixel_fifo(Pixel& pxl);
 
     PPU();
     void test_ppu();
