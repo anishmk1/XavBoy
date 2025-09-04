@@ -23,7 +23,7 @@ void LCD::write_to_framebuffer() {
     // ppu->pop_pixel_fifo(pixels);
 
     for (int i = 0; i < 8; i++) {
-        Pixel pxl = pixels[8];
+        Pixel pxl = pixels[i];
         uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
         framebuffer[framebuffer_write_ptr_x][framebuffer_write_ptr_y] = pxl_rgb;
