@@ -214,6 +214,7 @@ void PPU::fetch_pixel(int pixel_x) {
 
 // Tick mcycles of the PPU
 void PPU::ppu_tick(int mcycles){
+    if (CPU_ONLY) return;
     if ((mem->memory[REG_LCDC] & LCDC_ENABLE_BIT) == 0) return;
 
     static int mcycle_cnt = 0;     // initialized once, persists across calls

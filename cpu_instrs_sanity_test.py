@@ -35,7 +35,7 @@ for rom in roms:
         continue
 
     # Run the program with the ROM path as argument
-    run_result = subprocess.run(["./myprogram", rom, "--quiet"], cwd=".")
+    run_result = subprocess.run(["./myprogram", rom, "--quiet", "--cpu_only"], cwd=".")
     if run_result.returncode != 0:
         results[rom] = "RUNTIME ERROR"
         continue

@@ -28,7 +28,7 @@ public:
     SDL_Renderer* renderer  = nullptr;
     bool frame_ready;
 
-    int init_screen();
+    void init_screen();
     void close_window();
     void write_to_framebuffer(Pixel& pxl);
     void test_write_to_fb();

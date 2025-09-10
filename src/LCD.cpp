@@ -59,12 +59,14 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
 }
 
 void LCD::close_window() {
+    if (CPU_ONLY) return;
     // Clean up
     SDL_DestroyWindow(window);
     SDL_Quit();
 }
 
 void LCD::draw_frame() {
+    if (CPU_ONLY) return;
     this->frame_ready = false;
     
     // debug_file << "     [draw_frame] Abt to SDL_UpdateTexture" << std::endl;
@@ -125,13 +127,15 @@ void LCD::draw_frame() {
 }
 
 
-int LCD::init_screen() {
+void LCD::init_screen() {
+    if (CPU_ONLY) return;
+
     std::cout << "SDL Window\n";
 
     // Initialize SDL (video subsystem only)
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << "SDL_Init Error: " << SDL_GetError() << std::endl;
-        return 1;
+        return;
     }
 
     // Create a window
@@ -150,7 +154,7 @@ int LCD::init_screen() {
     );
     if (!renderer) {
         std::cerr << "SDL_CreateRenderer Error: " << SDL_GetError() << std::endl;
-        return 1;
+        return;
     }
 
     // Set scaling hint (for crisp pixels) - since framebuffer from Gameboyis only 160x144 pixels but output res is 1000x900
@@ -174,8 +178,8 @@ int LCD::init_screen() {
     if (!window) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
-        return 1;
+        return;
     }
 
-    return 0;
+    return;
 }

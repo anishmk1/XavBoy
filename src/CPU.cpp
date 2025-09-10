@@ -245,10 +245,12 @@
         // check for infinite loop
         // NOTE: Remember to disable this when you want to test graphics - LCD will be ON and inifinite loop will
         //       allow PPU to operate freely.
-        // if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
-        //     print ("Detected Infinite loop. Exiting sim\n");
-        //     std::exit(EXIT_SUCCESS);
-        // }
+        if (CPU_ONLY) {
+            if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
+                print ("Detected Infinite loop. Exiting sim\n");
+                std::exit(EXIT_SUCCESS);
+            }
+        }
 
         // Interrupt handling
         rf.debug0 = mmio->IME;

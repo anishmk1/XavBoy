@@ -35,6 +35,7 @@ bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
 bool PRINT_REGS_EN = true;
+bool CPU_ONLY = false;
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
@@ -101,6 +102,23 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
     std::this_thread::sleep_for(wait_duration);
 }
 
+// Poll for events
+// SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
+// Loop exits once all events are popped off the q
+void sdl_main_loop(bool& main_loop_running) {
+    if (CPU_ONLY) return;
+
+    SDL_Event event;
+
+    while (SDL_PollEvent(&event)) {
+        if (event.type == SDL_QUIT) {
+            main_loop_running = false; // Window closed
+
+            debug_file << "CLOSING SDL WINDOW" << std::endl;
+            lcd->close_window();
+        }
+    }
+}
 
 //------------------------------------------//
 //            Emulate the Gameboy           //
@@ -162,6 +180,8 @@ int emulate(int argc, char* argv[]) {
             DEBUGGER = true;
         } else if (strcmp(argv[i], "--quiet") == 0) {
             PRINT_REGS_EN = false;
+        } else if (strcmp(argv[i], "--cpu_only") == 0) {
+            CPU_ONLY = true;
         } else if (argv[i][0] != '-') {
             rom_path = std::string(argv[i]);
         }
@@ -182,26 +202,15 @@ int emulate(int argc, char* argv[]) {
     print ("Starting main loop\n\n");
     debug_file << "Starting main loop" << std::endl;
     
-    SDL_Event event;
     bool main_loop_running = true;
     while (main_loop_running) {  // main loop
-        // Poll for events
-        // SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
-        // Loop exits once all events are popped off the q
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                main_loop_running = false; // Window closed
 
-                debug_file << "CLOSING SDL WINDOW" << std::endl;
-                lcd->close_window();
-            }
-        }
+        // SDL Main Loop - Polls and services SDL Events like interacting with App window
+        // In CPU Only mode, this function exits immediately and main_loop_running will never dsiable
+        // So program will run indefinitely (or until forever loop detected??)
+        sdl_main_loop(main_loop_running);
 
-        // debug_file << "     [emulate] About to query texture: " << static_cast<void*>(lcd->texture) << std::endl;
-        // debug_file << "     [emulate] Renderer state: " << static_cast<void*>(lcd->renderer) << std::endl;
-        // debug_file << "     [emulate] frame_ready = " << lcd->frame_ready << std::endl;
         if (lcd->frame_ready) {
-            // debug_file << "     [emulate] Abt to draw_frame" << std::endl;
             lcd->draw_frame();
         }
 
@@ -218,7 +227,6 @@ int emulate(int argc, char* argv[]) {
             assert(GAMEBOY_CPU_FREQ_HZ);
             // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
-        // debug_file << "     [emulate] Abt to call ppu_tick" << std::endl;
         ppu->ppu_tick(mcycles);
         mmio->incr_timers(mcycles);
 
