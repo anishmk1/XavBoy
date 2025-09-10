@@ -21,9 +21,8 @@ class Debug {
 public:
     // long free_clk;
 
-    void* texture_ptr_val;
-    long instr_cnt;
-    long mcycle_cnt;
+    unsigned long instr_cnt = 0;
+    unsigned long mcycle_cnt = 0;
     long num_steps_left;
     bool run;
     uint8_t tgt_instr;

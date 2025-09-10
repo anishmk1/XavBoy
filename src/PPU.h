@@ -37,10 +37,11 @@ typedef struct {
 class FIFO {
 public:
     Pixel pixels[FIFO_DEPTH];   // -----> [0 1 2 ... 15] ----->
-    int size;
+    int size = 0;
 
     bool push(Pixel pxl);
     bool pop(Pixel& pxl);
+    void print_contents();
 };
 
 class PPU {
@@ -53,7 +54,6 @@ public:
     void draw_pixels();
     void fetch_pixel(int pixel_x);
     void render_pixel();
-    bool pop_pixel_fifo(Pixel& pxl);
 
     PPU();
     void test_ppu();

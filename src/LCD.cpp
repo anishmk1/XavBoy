@@ -36,7 +36,6 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
     // Pixel pxl = pixels[i];
     uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
-    // assert((framebuffer_write_ptr_x >= 0) && (framebuffer_write_ptr_x < ))
     framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
 
     // Manage frame buffer pointers
@@ -68,7 +67,7 @@ void LCD::close_window() {
 void LCD::draw_frame() {
     this->frame_ready = false;
     
-    debug_file << "     [draw_frame] Abt to SDL_UpdateTexture" << std::endl;
+    // debug_file << "     [draw_frame] Abt to SDL_UpdateTexture" << std::endl;
     // debug_file << "     [draw_frame] texture == nullptr ? " << (texture == nullptr) << std::endl;
 
     // TODO: Worth exploring:: from SDL Wiki reg SDL_UpdateTexture
@@ -81,23 +80,18 @@ void LCD::draw_frame() {
         return;
     }
 
-    if (!framebuffer) {
-        debug_file << "Error: framebuffer is NULL\n" << std::endl;
-        return;
-    }
-
     // / Right before SDL_QueryTexture
-    debug_file << "     [draw_frame] About to query texture: " << static_cast<void*>(texture) << std::endl;
-    debug_file << "     [draw_frame] Renderer state: " << static_cast<void*>(renderer) << std::endl;
+    // debug_file << "     [draw_frame] About to query texture: " << static_cast<void*>(texture) << std::endl;
+    // debug_file << "     [draw_frame] Renderer state: " << static_cast<void*>(renderer) << std::endl;
 
     // Verify texture dimensions
-    int w, h;
-    debug_file << "     Abt to SDL_QueryTexture" << std::endl;
-    int result = SDL_QueryTexture(texture, nullptr, nullptr, &w, &h);
-    if (result != 0) {
-        debug_file << "SDL_QueryTexture error: " << SDL_GetError() << std::endl;
-    }
-    debug_file << "Texture dimensions: " << w << "x" << h << std::endl;
+    // int w, h;
+    // debug_file << "     Abt to SDL_QueryTexture" << std::endl;
+    // int result = SDL_QueryTexture(texture, nullptr, nullptr, &w, &h);
+    // if (result != 0) {
+    //     debug_file << "SDL_QueryTexture error: " << SDL_GetError() << std::endl;
+    // }
+    // debug_file << "Texture dimensions: " << w << "x" << h << std::endl;
 
     // Check if pitch calculation matches texture width
     // int expected_pitch = w * sizeof(uint32_t);
@@ -116,20 +110,16 @@ void LCD::draw_frame() {
 
     // // Set renderer draw color to white (RGBA: 255,255,255,255)
     // SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-    debug_file << "     [draw_frame] Abt to SDL_RenderClear" << std::endl;
 
     // Clear screen
     SDL_RenderClear(renderer);
 
-
-    debug_file << "     [draw_frame] halfway" << std::endl;
 
     // Draw framebuffer texture 
     // 1. Copies the framebuffer to the renderer (background)
     // 2. Changes are made in the background to not cause glitches on the screen
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
 
-    debug_file << "     [draw_frame] Abt to SDL_RenderPresent" << std::endl;
     // Show it
     SDL_RenderPresent(renderer);
 }
@@ -180,8 +170,6 @@ int LCD::init_screen() {
         160,
         144
     );
-    debug_file << "Initializing texture to " << static_cast<void*>(texture) << std::endl;
-    dbg->texture_ptr_val = static_cast<void*>(texture);
 
     if (!window) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;

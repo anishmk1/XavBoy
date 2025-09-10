@@ -33,6 +33,13 @@ constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 // constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1 << 1;   // Bit 1
 // constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 1 << 0;   // Bit 0   BG & Window enable / priority
 
+void FIFO::print_contents() {
+    debug_file << "pixel_fifo contents..." << std::endl;
+    for (int i = 0; i < FIFO_DEPTH; i++) {
+        debug_file << "     pixels[" << i << "] = {color=" << static_cast<int>(pixels[i].color)
+                    << "; valid=" << pixels[i].valid << "}" << std::endl;
+    }
+}
 
 
 bool FIFO::push(Pixel pxl) {
@@ -69,12 +76,15 @@ bool FIFO::pop(Pixel& pxl) {
 
 
     // debug_file << "Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << std::endl;
-    debug_file  << "     Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << "; pxl.valid =" 
-                << pxl.valid << "; framebuffer x,y = {" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
-    // assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
-    if (pxl.valid == false) {
-        debug_file << "POPPED PXL INVALID" << std::endl;
-    }
+    // debug_file  << "     Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << "; pxl.valid =" 
+    //             << pxl.valid << "; framebuffer x,y = {" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
+    // if (pxl.valid == false) {
+    //     debug_file << "[PPU FIFO POP] POPPED PXL INVALID; size = " << size << std::endl;
+    //     std::exit(EXIT_FAILURE);
+    // } else {
+    //     debug_file << "[PPU FIFO POP] popped pxl is valid" << std::endl;
+    // }
+    assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
 
     return true;
 }
@@ -107,11 +117,6 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
         return 0;
     }
 }
-
-bool PPU::pop_pixel_fifo(Pixel& pxl) {
-    return pixel_fifo.pop(pxl);
-}
-
 
 
 
@@ -147,13 +152,15 @@ bool PPU::pop_pixel_fifo(Pixel& pxl) {
 
 void PPU::render_pixel() {
     Pixel pxl;
-    if (pop_pixel_fifo(pxl)) {
+    // pixel_fifo.print_contents();
+    bool pop_result = pixel_fifo.pop(pxl);
+    debug_file << "     [render_pixel] @" << dbg->mcycle_cnt << " mcycles:  pop_pixel_fifo returned " << pop_result << "; LY = " 
+                << "0x" << std::hex << static_cast<int>(mem->get(REG_LY)) << std::dec << "; framebuff x,y={" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
+
+    if (pop_result) {
         // Write to SDL framebuffer is equivalent to hardawre drawing to
         // the screen, 1 pixel and
         lcd->write_to_framebuffer(pxl);
-        debug_file << "     [render_pixel] Wrote above (popped) pxl to framebuffer" << std::endl;
-    } else {
-        debug_file << "     [render_pixel] pop_pixel_fifo returned false" << std::endl;
     }
 
 }
@@ -215,6 +222,7 @@ void PPU::ppu_tick(int mcycles){
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if (dbg->mcycle_cnt >= 20000000) {
         print ("Run for enough time. Exit\n");
+        debug_file << "Run for enough time. Exit" << std::endl;
         std::exit(EXIT_SUCCESS);
     }
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -300,7 +308,5 @@ void PPU::ppu_tick(int mcycles){
             default:
                 break;
         }
-
-        debug_file << "     [ppu_tick] End of function" << std::endl;
     }
 }
