@@ -192,11 +192,16 @@ int emulate(int argc, char* argv[]) {
             if (event.type == SDL_QUIT) {
                 main_loop_running = false; // Window closed
 
+                debug_file << "CLOSING SDL WINDOW" << std::endl;
                 lcd->close_window();
             }
         }
 
+        debug_file << "     [emulate] About to query texture: " << static_cast<void*>(lcd->texture) << std::endl;
+        debug_file << "     [emulate] Renderer state: " << static_cast<void*>(lcd->renderer) << std::endl;
+        debug_file << "     [emulate] frame_ready = " << lcd->frame_ready << std::endl;
         if (lcd->frame_ready) {
+            debug_file << "     [emulate] Abt to draw_frame" << std::endl;
             lcd->draw_frame();
         }
 
@@ -213,6 +218,7 @@ int emulate(int argc, char* argv[]) {
             assert(GAMEBOY_CPU_FREQ_HZ);
             // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
+        debug_file << "     [emulate] Abt to call ppu_tick" << std::endl;
         ppu->ppu_tick(mcycles);
         mmio->incr_timers(mcycles);
 

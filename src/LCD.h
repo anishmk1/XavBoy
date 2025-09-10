@@ -4,6 +4,8 @@
 
 #include <SDL2/SDL.h>
 
+#include "PPU.h"
+
 // 32-bit pixels: 0xRRGGBBAA
 constexpr int SCREEN_WIDTH  = 160;
 constexpr int SCREEN_HEIGHT = 144;
@@ -21,16 +23,18 @@ class LCD {
     };
 
 public:
-    SDL_Window* window;
-    SDL_Texture* texture;
-    SDL_Renderer* renderer;
+    SDL_Window* window      = nullptr;
+    SDL_Texture* texture    = nullptr;
+    SDL_Renderer* renderer  = nullptr;
     bool frame_ready;
 
     int init_screen();
     void close_window();
-    void write_to_framebuffer();
+    void write_to_framebuffer(Pixel& pxl);
     void test_write_to_fb();
     void draw_frame();
+    int get_fb_x();
+    int get_fb_y();
 };
 
 

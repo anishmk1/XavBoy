@@ -40,7 +40,7 @@ public:
     int size;
 
     bool push(Pixel pxl);
-    Pixel pop();
+    bool pop(Pixel& pxl);
 };
 
 class PPU {
@@ -52,7 +52,8 @@ public:
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
     void fetch_pixel(int pixel_x);
-    void pop_pixel_fifo(Pixel& pxl);
+    void render_pixel();
+    bool pop_pixel_fifo(Pixel& pxl);
 
     PPU();
     void test_ppu();

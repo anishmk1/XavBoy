@@ -25,37 +25,58 @@ const uint16_t REG_BGP  = 0xff47;   // BG Palette Data
 
 // LCDC Register fields
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
-constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 1 << 6;   // Bit 6
-constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 1 << 5;   // Bit 5
-constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 1 << 4;   // Bit 4
-constexpr uint8_t LCDC_BG_TILEMAP_BIT        = 1 << 3;   // Bit 3
-constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 1 << 2;   // Bit 2
-constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1 << 1;   // Bit 1
-constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 1 << 0;   // Bit 0   BG & Window enable / priority
+// constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 1 << 6;   // Bit 6
+// constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 1 << 5;   // Bit 5
+// constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 1 << 4;   // Bit 4
+// constexpr uint8_t LCDC_BG_TILEMAP_BIT        = 1 << 3;   // Bit 3
+// constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 1 << 2;   // Bit 2
+// constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1 << 1;   // Bit 1
+// constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 1 << 0;   // Bit 0   BG & Window enable / priority
 
 
 
 bool FIFO::push(Pixel pxl) {
-    if (size < 16) {
-        pixels[FIFO_DEPTH - 1 - size] = pxl;
-        size++;
-        return true; // Push successful
+
+    if (size >= FIFO_DEPTH) {
+        // debug_file << "[FIFO Push] FIFO Full detected; size = " << size << std::endl;
+        return false; // FIFO full
     }
 
-    return false;   // Push unsuccessful
+    pixels[size] = pxl;  // Insert at the end
+    size++;
+    // debug_file << "[FIFO Push] Pushed pxl.color = " << static_cast<int>(pxl.color) << "; val" << std::endl;
+    return true;
 }
 
-Pixel FIFO::pop() {
-    Pixel pxl = pixels[FIFO_DEPTH-1];
-    for (int i = 1; i < FIFO_DEPTH; i++) {
-        pixels[i] = pixels[i-1];
+bool FIFO::pop(Pixel& pxl) {
+
+    if (size == 0) {
+        return false;
     }
-    // ZERO out pixels[0]
-    pixels[0] = Pixel{};
+
+    // Retrieve the pixel from the FRONT (index 0)
+    pxl = pixels[0];
+
+    // Shift everything to the left
+    for (int i = 0; i < FIFO_DEPTH - 1; ++i) {
+        pixels[i] = pixels[i + 1];
+    }
+
+    // Clear the last pixel (now empty)
+    pixels[FIFO_DEPTH - 1] = Pixel{};
     size--;
 
-    assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
-    return pxl;
+
+
+    // debug_file << "Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << std::endl;
+    debug_file  << "     Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << "; pxl.valid =" 
+                << pxl.valid << "; framebuffer x,y = {" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
+    // assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
+    if (pxl.valid == false) {
+        debug_file << "POPPED PXL INVALID" << std::endl;
+    }
+
+    return true;
 }
 
 
@@ -87,8 +108,8 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     }
 }
 
-void PPU::pop_pixel_fifo(Pixel& pxl) {
-    pxl = pixel_fifo.pop();
+bool PPU::pop_pixel_fifo(Pixel& pxl) {
+    return pixel_fifo.pop(pxl);
 }
 
 
@@ -124,49 +145,17 @@ void PPU::pop_pixel_fifo(Pixel& pxl) {
 
 
 
- /**
-  * BLANK SCREEN PLAN:
-  *     The color palette is set such that all values in the tilemap map to color grey. Doesnt matter what junk is in the tilemap memory
-  *     No objects or sprites.
-  *     The only thing to worry about now is how to get the background pixels. (SCX and SCY are both 0,0)
-  *     So what is the 
-  */
-
-void PPU::draw_pixels() {
-    // BEGIN SCANLINE
-    std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
-    // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
-    uint8_t ly = mem->get(REG_LY);
-    uint8_t color_palette = mem->get(REG_BGP);
-    for (int tile_x = 0; tile_x < 32; tile_x++) {
-        // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
-        uint16_t tile_id_addr = 0x9800 + tile_x + (0 /*scanline 0 times number of X indices in a scanline*/);
-        uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
-
-        // Then fetch what that tile looks like from Memory.
-        // Get the 16 byte data (each pixel is 2 bits. 8x8 = 64 pixels => 128 bits => 128/8 = 16 bytes)
-        uint16_t tile_data_addr = 0x9000 + (tile_id * 16);       // 0x9000 = base addr for VRAM Tile Data for (BG/WIN when LCDC.4 is 0 and Using unsigned tile addressign mode)
-        for (int i = 0; i < 16; i++) {
-            // Populating each byte of tile data
-            tile_data[i] = mem->get(tile_data_addr);
-        }
-
-
-        // COnstruct a list of 8 Pixels to push into the Pixel FIFO - given current tiledata and LY value
-        int tile_local_y = ly % 8;      // ly is y coord across all tiles - what is the y relative to the current tile?
-        uint8_t lsb_byte = tile_data[2*tile_local_y];
-        uint8_t msb_byte = tile_data[2*tile_local_y + 1];
-        for (int i = 0; i < 8; i++) {   // Loop through each column of the current tile
-            int color_id_lsb = (lsb_byte >> (7-i)) & 0b1;
-            int color_id_msb = (msb_byte >> (7-i)) & 0b1;
-            int color_id = color_id_lsb + (color_id_msb << 1); 
-
-            Pixel pxl;
-            pxl.color = static_cast<Color>((color_palette >> (2*color_id)) & 0b11);
-
-            pixel_fifo.push(pxl);   // Note: Is the ordering of this correct? It's technically pushing in 0th Pixel first.
-        }
+void PPU::render_pixel() {
+    Pixel pxl;
+    if (pop_pixel_fifo(pxl)) {
+        // Write to SDL framebuffer is equivalent to hardawre drawing to
+        // the screen, 1 pixel and
+        lcd->write_to_framebuffer(pxl);
+        debug_file << "     [render_pixel] Wrote above (popped) pxl to framebuffer" << std::endl;
+    } else {
+        debug_file << "     [render_pixel] pop_pixel_fifo returned false" << std::endl;
     }
+
 }
 
 /**
@@ -207,6 +196,7 @@ void PPU::fetch_pixel(int pixel_x) {
 
     Pixel pxl;
     pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+    pxl.valid = true;
 
     pixel_fifo.push(pxl);
 
@@ -258,8 +248,13 @@ void PPU::ppu_tick(int mcycles){
 
             case PPUMode::DRAW_PIXELS: {
 
+                render_pixel();
+
                 int pixel_x = (dot_cnt - 81);
-                fetch_pixel(pixel_x);
+                // debug_file << "     [ppu_tick] Before fetch pickel" << std::endl;
+                fetch_pixel(pixel_x);   // Pushes each pixel to the fifo
+                // debug_file << "     [ppu_tick] After fetch pickel" << std::endl;
+
                 
                 if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Moving on to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
@@ -285,11 +280,12 @@ void PPU::ppu_tick(int mcycles){
                 if (dot_cnt == 1) {
                     // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
                     lcd->frame_ready = true;
-                    lcd->test_write_to_fb();
+                    // lcd->test_write_to_fb();
                 } else if (dot_cnt == 456) {
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
                     uint8_t new_LY = curr_LY + 1;
-                    if (new_LY == 155) {
+                    if (new_LY == 146) {
+                    // if (new_LY == 155) {     FIXME: uncomment this. Changing this so it spends less time in VBLANK for debug
                         debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl;
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
@@ -304,5 +300,7 @@ void PPU::ppu_tick(int mcycles){
             default:
                 break;
         }
+
+        debug_file << "     [ppu_tick] End of function" << std::endl;
     }
 }

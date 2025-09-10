@@ -1,5 +1,6 @@
 #include <SDL2/SDL.h>
 #include <iostream>
+#include <fstream>
 
 #include "LCD.h"
 #include "main.h"
@@ -18,34 +19,44 @@ void LCD::test_write_to_fb() {
     }
 }
 
-void LCD::write_to_framebuffer() {
-    Pixel pixels[8];
+int LCD::get_fb_x() {return this->framebuffer_write_ptr_x;}
+int LCD::get_fb_y() {return this->framebuffer_write_ptr_y;}
+
+
+// DRAW PIXELS
+
+
+
+
+void LCD::write_to_framebuffer(Pixel& pxl) {
+    // Pixel pixels[8];
     // ppu->pop_pixel_fifo(pixels);
 
-    for (int i = 0; i < 8; i++) {
-        Pixel pxl = pixels[i];
-        uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
+    // for (int i = 0; i < 8; i++) {
+    // Pixel pxl = pixels[i];
+    uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
-        framebuffer[framebuffer_write_ptr_x][framebuffer_write_ptr_y] = pxl_rgb;
+    // assert((framebuffer_write_ptr_x >= 0) && (framebuffer_write_ptr_x < ))
+    framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
 
-
-        // Manage frame buffer pointers
-        if (framebuffer_write_ptr_x == (SCREEN_WIDTH-1)) {
-            // Reached end of current scanline
-            framebuffer_write_ptr_x = 0;
-            if (framebuffer_write_ptr_y == (SCREEN_HEIGHT-1)) {
-                // Reached end of frame - ready to display
-                framebuffer_write_ptr_y = 0;
-                this->frame_ready = true;
-            } else {
-                // Frame not finished - move to the next scanline
-                framebuffer_write_ptr_y++;
-            }
+    // Manage frame buffer pointers
+    if (framebuffer_write_ptr_x == (SCREEN_WIDTH-1)) {
+        // Reached end of current scanline
+        framebuffer_write_ptr_x = 0;
+        if (framebuffer_write_ptr_y == (SCREEN_HEIGHT-1)) {
+            // Reached end of frame - ready to display
+            framebuffer_write_ptr_y = 0;
+            this->frame_ready = true;
         } else {
-            // Current scanline not finished - point to next set of 8 pixels (tile)
-            framebuffer_write_ptr_x += 8;
+            // Frame not finished - move to the next scanline
+            framebuffer_write_ptr_y++;
         }
+    } else {
+        // Current scanline not finished - point to next set of 8 pixels (tile)
+        // framebuffer_write_ptr_x += 8;
+        framebuffer_write_ptr_x++;
     }
+    // }
 }
 
 void LCD::close_window() {
@@ -55,21 +66,70 @@ void LCD::close_window() {
 }
 
 void LCD::draw_frame() {
+    this->frame_ready = false;
     
+    debug_file << "     [draw_frame] Abt to SDL_UpdateTexture" << std::endl;
+    // debug_file << "     [draw_frame] texture == nullptr ? " << (texture == nullptr) << std::endl;
+
+    // TODO: Worth exploring:: from SDL Wiki reg SDL_UpdateTexture
+    // This is a fairly slow function, intended for use with static textures that do not change often.
+    // If the texture is intended to be updated often, it is preferred to create the texture as streaming and use the locking functions referenced below. 
+    // While this function will work with streaming textures, for optimization reasons you may not get the pixels back if you lock the texture afterward.
+    // Add these checks:
+    if (!texture) {
+        debug_file << "Error: texture is NULL\n" << std::endl;
+        return;
+    }
+
+    if (!framebuffer) {
+        debug_file << "Error: framebuffer is NULL\n" << std::endl;
+        return;
+    }
+
+    // / Right before SDL_QueryTexture
+    debug_file << "     [draw_frame] About to query texture: " << static_cast<void*>(texture) << std::endl;
+    debug_file << "     [draw_frame] Renderer state: " << static_cast<void*>(renderer) << std::endl;
+
+    // Verify texture dimensions
+    int w, h;
+    debug_file << "     Abt to SDL_QueryTexture" << std::endl;
+    int result = SDL_QueryTexture(texture, nullptr, nullptr, &w, &h);
+    if (result != 0) {
+        debug_file << "SDL_QueryTexture error: " << SDL_GetError() << std::endl;
+    }
+    debug_file << "Texture dimensions: " << w << "x" << h << std::endl;
+
+    // Check if pitch calculation matches texture width
+    // int expected_pitch = w * sizeof(uint32_t);
+    // int provided_pitch = 160 * sizeof(uint32_t);
+    // debug_file << "Expected pitch: " << expected_pitch << std::endl;
+    // debug_file << "Provided pitch: " << provided_pitch << std::endl;
+
+    // if (expected_pitch != provided_pitch) {
+    //     debug_file << "Warning: Pitch mismatch detected!" << std::endl;
+    // }
+
+
     // Upload it to texture
+    // WHY IS THIS LINE OF CODE SEGFAULTING?
     SDL_UpdateTexture(texture, nullptr, framebuffer, 160 * sizeof(uint32_t));
 
     // // Set renderer draw color to white (RGBA: 255,255,255,255)
     // SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    debug_file << "     [draw_frame] Abt to SDL_RenderClear" << std::endl;
 
     // Clear screen
     SDL_RenderClear(renderer);
+
+
+    debug_file << "     [draw_frame] halfway" << std::endl;
 
     // Draw framebuffer texture 
     // 1. Copies the framebuffer to the renderer (background)
     // 2. Changes are made in the background to not cause glitches on the screen
     SDL_RenderCopy(renderer, texture, nullptr, nullptr);
 
+    debug_file << "     [draw_frame] Abt to SDL_RenderPresent" << std::endl;
     // Show it
     SDL_RenderPresent(renderer);
 }
@@ -120,6 +180,8 @@ int LCD::init_screen() {
         160,
         144
     );
+    debug_file << "Initializing texture to " << static_cast<void*>(texture) << std::endl;
+    dbg->texture_ptr_val = static_cast<void*>(texture);
 
     if (!window) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;

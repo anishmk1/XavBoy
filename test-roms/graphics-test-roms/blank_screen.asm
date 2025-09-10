@@ -1,4 +1,5 @@
 ; Compile with RGBASM
+; cd XavBoy/test-roms/graphics-test-roms
 ; rgbasm -o blank_screen.obj blank_screen.asm
 ; rgblink -o blank_screen.gb blank_screen.obj
 ; rgbfix -v -p 0 blank_screen.gb
@@ -16,7 +17,7 @@ Start:
     ; $FF = 11 11 11 11b = all shades mapped to black
     ; $55 = 01 01 01 01b = all shades mapped to light grey
     ; $00 = 00 00 00 00b = all shades mapped to white
-    ld   a, $00
+    ld   a, $55
     ld   [$FF47], a
 
     ; Turn on LCD (LCDC, 0xFF40)

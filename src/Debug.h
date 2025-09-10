@@ -20,6 +20,8 @@ typedef struct {
 class Debug {
 public:
     // long free_clk;
+
+    void* texture_ptr_val;
     long instr_cnt;
     long mcycle_cnt;
     long num_steps_left;
