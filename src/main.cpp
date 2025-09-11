@@ -166,7 +166,8 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb";
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
-    rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
+    // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
+    rom_path = "test-roms/graphics-test-roms/color_bands.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)

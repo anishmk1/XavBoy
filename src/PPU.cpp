@@ -154,8 +154,8 @@ void PPU::render_pixel() {
     Pixel pxl;
     // pixel_fifo.print_contents();
     bool pop_result = pixel_fifo.pop(pxl);
-    debug_file << "     [render_pixel] @" << dbg->mcycle_cnt << " mcycles:  pop_pixel_fifo returned " << pop_result << "; LY = " 
-                << "0x" << std::hex << static_cast<int>(mem->get(REG_LY)) << std::dec << "; framebuff x,y={" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
+    // debug_file << "     [render_pixel] @" << dbg->mcycle_cnt << " mcycles:  pop_pixel_fifo returned " << pop_result << "; LY = " 
+    //             << "0x" << std::hex << static_cast<int>(mem->get(REG_LY)) << std::dec << "; framebuff x,y={" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
 
     if (pop_result) {
         // Write to SDL framebuffer is equivalent to hardawre drawing to
@@ -169,7 +169,7 @@ void PPU::render_pixel() {
  * Given a pixel x coordinate - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
  */
 void PPU::fetch_pixel(int pixel_x) {
-    if (pixel_x >= 160) return;     // Note: This is not needed once HBLANK is implemented
+    if (pixel_x >= 160) return;     // DRAW_PIXELS runs for 200 dots in XavBoy (arbitrary) so remaining dots just wait
 
 
     std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
@@ -260,28 +260,36 @@ void PPU::ppu_tick(int mcycles){
                 render_pixel();
 
                 int pixel_x = (dot_cnt - 81);
-                // debug_file << "     [ppu_tick] Before fetch pickel" << std::endl;
+
                 fetch_pixel(pixel_x);   // Pushes each pixel to the fifo
-                // debug_file << "     [ppu_tick] After fetch pickel" << std::endl;
 
                 
-                if (dot_cnt == 456){     // FIXME: Should actually be variable dot cnt length. And HBLANK should make up the rest
-                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 456. Moving on to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
+                // Note: Fixing DRAW_PIXELS to always take up 200 dots. This is sufficient to run most games since most games just care that VBLANK intrpt is received at the right time
+                //       HBLANK timing accuracy generally doesnt matter except for niche raster/parallax effects.
+                // TODO: Should actually be variable dot cnt length based on hardware accurate fetcher/fifo modeling. And HBLANK covers the rest - low priority
+                if (dot_cnt == 280){
+                    debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl;
 
+                    this->mode = PPUMode::HBLANK;
+                }
+                break;
+            }
+
+            case PPUMode::HBLANK: {
+                if (dot_cnt == 456) {
                     uint8_t new_LY = curr_LY + 1;
                     mem->set(REG_LY, new_LY, 1);
+
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
-
-                    // lcd->update_framebuffer_ptrs(curr_LY, );
-                    // lcd->write_to_framebuffer();
-
-                    // FIXME: pretending HBLANK doesnt exist for now..
                     if (new_LY == 144) {
+                        debug_file << "[LY = " << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
                         this->mode = PPUMode::VBLANK;
                     } else {
+                        debug_file << "[LY = " << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
                         this->mode = PPUMode::OAM_SCAN;
                     }
                 }
+
                 break;
             }
 
@@ -292,9 +300,9 @@ void PPU::ppu_tick(int mcycles){
                     // lcd->test_write_to_fb();
                 } else if (dot_cnt == 456) {
                     debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl;
+
                     uint8_t new_LY = curr_LY + 1;
-                    if (new_LY == 146) {
-                    // if (new_LY == 155) {     FIXME: uncomment this. Changing this so it spends less time in VBLANK for debug
+                    if (new_LY == 155) {
                         debug_file << "[LY = " << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl;
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
