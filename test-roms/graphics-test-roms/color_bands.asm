@@ -14,6 +14,11 @@ SECTION "Header", ROM0[$100]
 
 SECTION "Main", ROM0
 Start:
+    ; Disable LCD at start
+    ldh a, [0xff40]     ; load current LCDC value
+    and %01111111       ; clear bit 7 (LCD enable)
+    ldh [0xff40], a     ; write back to LCDC
+
     ;-------------------------------;
     ;    Write Tile Data to VRAM    ;
     ;-------------------------------;
@@ -51,17 +56,18 @@ Start:
     call CopyToVRAM
 
 
-
 ;-------------------------------;
 ;    Write Tile Map Indexes     ;
 ;-------------------------------;
 ; --- setup constants ---
     ld b, 0             ; b = row = 0
+    ld hl, $9800        ; Init HL to start of BG Tile Map
 RowLoop:
     ld a, b
     cp 32               ; if row == 32, then ExitLoop
     jr z, ExitLoop
     
+
     ; --- decide tile index based on row ---
     cp 8                ; check row < 8 ?
     jr c, RowTile0
@@ -87,8 +93,6 @@ RowTile3:
 ; a contains the tile index value for this row (selected above)
 RowTileChosen:
     ld c, 32            ; column counter (32 tiles per row)
-    
-    ld hl, $9800        ; Init HL to start of BG Tile Map
 
 ColLoop:
     ld [hl+], a         ; write tile index and advance HL
@@ -102,6 +106,15 @@ ExitLoop:
     ; Enable LCD
     ld a, %10010001     ; LCD on; BG Tile Data Mode = unsigned; BG on
     ldh [$ff40], a      ; rLCDC <= a (upper byte is FF implicit in ldh)
+    
+
+    ;;;;;;;; BREAKPOINT 2 ;;;;;;;;;;;;;
+    ld hl, $FFFE   ; HL = target address
+    ld e, $AC
+    ld [hl], e      ; keep an eye on the value of b (ROW). Make sure it goes to 32
+    ld [hl], 0
+    ;;;;;;;; BREAKPOINT 2 ;;;;;;;;;;;;;
+
 
 Forever:
     jr Forever

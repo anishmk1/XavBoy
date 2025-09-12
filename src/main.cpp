@@ -204,6 +204,7 @@ int emulate(int argc, char* argv[]) {
     debug_file << "Starting main loop" << std::endl;
     
     bool main_loop_running = true;
+    int hit_bp_1 = false;
     while (main_loop_running) {  // main loop
 
         // SDL Main Loop - Polls and services SDL Events like interacting with App window
@@ -214,6 +215,28 @@ int emulate(int argc, char* argv[]) {
         if (lcd->frame_ready) {
             lcd->draw_frame();
         }
+
+        // if ((mem->get(REG_LCDC) & LCDC_ENABLE_BIT) != 0) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "LCD Turned on";
+        // }
+        // if ((mem->get(0xfffe) == 0xab) && (hit_bp_1 == false)) {
+        //     hit_bp_1 = true;
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "mem[FFFE] <= 0xAB";
+        // }
+        if (mem->get(0xfffe) == 0xac) {
+            dbg->bp_info.breakpoint = true;
+            dbg->bp_info.msg = "BPT 2: In ExitLoop after enabling LCD";
+        }
+        // if (mem->get(REG_BGP) == 0xe4) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "Palette reg set";
+        // }
+        // if (dbg->mcycle_cnt == 500) {
+        //     dbg->bp_info.breakpoint = true;
+        //     dbg->bp_info.msg = "Hit cycle 500";
+        // }
 
 
         cpu->rf.debug0 = mmio->IME;
