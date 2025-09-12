@@ -3,6 +3,7 @@
 #define DEBUG_H
 
 #include <string>
+#include "PPU.h"
 
 class CPU;
 
@@ -19,7 +20,7 @@ typedef struct {
 
 class Debug {
 public:
-    // long free_clk;
+    Color last_framebuffer[144][160];
 
     unsigned long instr_cnt = 0;
     unsigned long mcycle_cnt = 0;

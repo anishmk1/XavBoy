@@ -1,5 +1,5 @@
 ; Compile with RGBASM
-; cd XavBoy/test-roms/graphics-test-roms
+; cd ./test-roms/graphics-test-roms
 ; rgbasm -o color_bands.obj color_bands.asm
 ; rgblink -o color_bands.gb color_bands.obj
 ; rgbfix -v -p 0 color_bands.gb
@@ -60,22 +60,22 @@ Start:
 ;    Write Tile Map Indexes     ;
 ;-------------------------------;
 ; --- setup constants ---
-    ld b, 0             ; b = row = 0
+    ld b, 0             ; b = pixel row = 0
     ld hl, $9800        ; Init HL to start of BG Tile Map
 RowLoop:
     ld a, b
-    cp 32               ; if row == 32, then ExitLoop
+    cp 144              ; if row == 144, then ExitLoop
     jr z, ExitLoop
     
 
     ; --- decide tile index based on row ---
-    cp 8                ; check row < 8 ?
+    cp 36               ; check row < 36?
     jr c, RowTile0
-    cp 16               ; check row < 16 ?
+    cp 72               ; check row < 72 ?
     jr c, RowTile1
-    cp 24               ; check row < 24 ?
+    cp 108              ; check row < 108?
     jr c, RowTile2
-    jr RowTile3 ; else (row >= 24)
+    jr RowTile3 ; else (row >= 108)
 
 
 RowTile0:

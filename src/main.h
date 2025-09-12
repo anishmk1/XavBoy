@@ -30,6 +30,7 @@ constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 
 extern std::ofstream logFile;
 extern std::ofstream debug_file;
+extern std::ofstream pixel_map;
 extern bool verbose;
 extern bool disable_prints;
 extern bool DEBUGGER;
@@ -68,5 +69,7 @@ extern LCD *lcd;
 #else
     #define DBG(x) do {} while(0)
 #endif
+
+// #define PXL(x) do { pixel_map << x; } while (0)
 
 #endif

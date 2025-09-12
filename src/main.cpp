@@ -31,6 +31,7 @@ MMIO *mmio;
 LCD *lcd;
 std::ofstream logFile;
 std::ofstream debug_file;
+std::ofstream pixel_map;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
@@ -285,6 +286,7 @@ int main(int argc, char* argv[]) {
     // setup_serial_output();
     // Separate debug log file
     debug_file.open("logs/debug.log");
+    pixel_map.open("logs/pixel_map.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc

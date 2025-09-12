@@ -28,20 +28,8 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 *   16-bit access bus -> 2^16 = 65536 addresses
 *   So 2^16 * 1 Byte = 2^6 KB memory = 64 KB Memory
 */
-// class Memory {
-
-//     size_t romSize;
-
-// public:
-    // std::vector<uint8_t> memory;
-    // MMIO *mmio;
 
     Memory::Memory () {
-        // this->mmio = mmio;
-        // mmio->mmio = &mem[0xFF00];      // MMIO region starts here
-        // mmio->mem = mem;
-        // mmio->mmio = &mem[0xFF00];
-        // mmio->init_mmio(mem[0xFF00]);
         // init all mem locations to 0
         memory = std::vector<uint8_t>(MEMORY_SIZE, 0);
 
@@ -232,8 +220,3 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
         }
         printx ("\n\n");
     }
-
-    // void dump_ROM() {
-    //     printf("")
-    // }
-// };

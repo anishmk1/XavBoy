@@ -22,6 +22,8 @@ class LCD {
         0x000000FF  // Black
     };
 
+    void print_framebuffer();
+
 public:
     SDL_Window* window      = nullptr;
     SDL_Texture* texture    = nullptr;
