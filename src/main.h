@@ -16,6 +16,8 @@
 const uint16_t REG_LCDC = 0xff40;   // LCD control
 const uint16_t REG_LY   = 0xff44;   // LCD Y co-ordinate [read-only]
 const uint16_t REG_BGP  = 0xff47;   // BG Palette Data
+const uint16_t REG_SCY  = 0xff42;   // Background viewport Y position
+const uint16_t REG_SCX  = 0xff43;   // Background viewport X position
 
 // LCDC Register fields
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
@@ -64,7 +66,7 @@ extern LCD *lcd;
             printf(__VA_ARGS__);               \
     } while (0)
 
-#ifdef DEBUG
+#ifdef DEBUG_MODE
     #define DBG(x) do { debug_file << x; } while(0)
 #else
     #define DBG(x) do {} while(0)

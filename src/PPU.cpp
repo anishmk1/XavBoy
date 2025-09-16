@@ -158,7 +158,7 @@ void PPU::render_pixel() {
 }
 
 /**
- * Given a pixel x coordinate - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
+ * Given a pixel x coordinate on the screen - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
  */
 void PPU::fetch_pixel(int pixel_x) {
     if (pixel_x >= 160) return;     // DRAW_PIXELS runs for 200 dots in XavBoy (arbitrary) so remaining dots just wait
@@ -168,14 +168,19 @@ void PPU::fetch_pixel(int pixel_x) {
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     uint8_t ly = mem->get(REG_LY);
     uint8_t color_palette = mem->get(REG_BGP);
+    uint8_t scy = mem->get(REG_SCY);
+    uint8_t scx = mem->get(REG_SCX);
 
     // New tile - re-fetch tile data
     if (pixel_x % 8 == 0) {
 
         int tile_x = pixel_x / 8;
 
+        // Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
+        uint16_t viewport_top_left_addr = 0x9800 + (scy * 32) + scx;    // 32 = number of horiz tiles in map
+
         // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
-        uint16_t tile_id_addr = 0x9800 + (ly * 32) + tile_x;        // TODO: Need to factor in terms for SCX/SCY
+        uint16_t tile_id_addr = viewport_top_left_addr + (ly * 32) + tile_x;
         uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
 
         // Then fetch what that tile looks like from Memory.
@@ -190,25 +195,20 @@ void PPU::fetch_pixel(int pixel_x) {
 
         DBG( std::endl);
         DBG( std::endl);
-        DBG( "New tile - fetching info below" << std::endl);
-        DBG( "tile_x = " << tile_x << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
-        DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
+        DBG( "      New tile - fetching info below" << std::endl);
+        DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
+        DBG( "      tile_id = " << static_cast<int>(tile_id) << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
         std::string debug_str = "";
         for (int i = 0; i < 16; i++) {
             debug_str += (std::to_string(static_cast<int>(tile_data[i])) + " ");
         }
 
-        DBG( "Tile_data = " << debug_str << std::endl);
-        DBG( "    pxl_x = ");
-        
-        if (pixel_x % 159 == 0) {
-            dbg->bp_info.breakpoint = true;
-            dbg->bp_info.msg = "Finished Row";       // SEEING ALL F??
-        }
+        DBG( "      Tile_data = " << debug_str << std::endl);
+        DBG( "      pxl_x = ");
     }
 
-    DBG( pixel_x << ", ");
+    DBG( std::dec << pixel_x << ", ");
 
 
     // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
@@ -265,8 +265,16 @@ void PPU::ppu_tick(int mcycles){
         // ------------------- //
         switch (this->mode) {
             case PPUMode::OAM_SCAN: {
+                if (curr_LY == 0 && dot_cnt == 1) {
+                    DBG("Frame: " << dbg->frame_cnt << std::endl);
+                    // // -------------------------- REMOVE -------
+                    // if (dbg->frame_cnt == 2) {
+                    //     std::exit(EXIT_SUCCESS);
+                    // }
+                    // // -------------------------- REMOVE -------
+                }
                 if (dot_cnt == 80) {    // Note - 80 might be off by 1..
-                    DBG("[LY = " << curr_LY << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                    DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt);
                     this->mode = PPUMode::DRAW_PIXELS;
                     // Loop through OAM memory and populate first 10 objects
                     // that are visible on this scanline (Y coord)
@@ -276,6 +284,9 @@ void PPU::ppu_tick(int mcycles){
             }
 
             case PPUMode::DRAW_PIXELS: {
+                if (dot_cnt == 81) {
+                    DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: Start fetching and rendering pixels @ mcycle = " << dbg->mcycle_cnt);
+                }
 
                 render_pixel();
 
@@ -288,8 +299,8 @@ void PPU::ppu_tick(int mcycles){
                 //       HBLANK timing accuracy generally doesnt matter except for niche raster/parallax effects.
                 // TODO: Should actually be variable dot cnt length based on hardware accurate fetcher/fifo modeling. And HBLANK covers the rest - low priority
                 if (dot_cnt == 280){
-                    // debug_file << "[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl;
-                    DBG("[LY = " << static_cast<int>(curr_LY) << "] DRAM_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                    // debug_file << "[LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl;
+                    DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl);
 
                     this->mode = PPUMode::HBLANK;
                 }
@@ -303,10 +314,13 @@ void PPU::ppu_tick(int mcycles){
 
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
                     if (new_LY == 144) {
-                        DBG("[LY = " << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                        DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::VBLANK;
+
+                        // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
+                        mem->set(0xfffa, 1);
                     } else {
-                        DBG("[LY = " << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                        DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::OAM_SCAN;
                     }
                 }
@@ -315,18 +329,25 @@ void PPU::ppu_tick(int mcycles){
             }
 
             case PPUMode::VBLANK: {
-                if (dot_cnt == 1) {
+                if (dot_cnt == 10) {
                     // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
-                    lcd->frame_ready = true;
-                    // lcd->test_write_to_fb();
+                    if (mcycle_cnt > 10) {
+                        // make sure it's not VBLANK out of init
+                        lcd->frame_ready = true;
+                    }
                 } else if (dot_cnt == 456) {
-                    DBG("[LY = " << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                    DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: dot_cnt == 456. Moving to next VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
 
                     uint8_t new_LY = curr_LY + 1;
                     if (new_LY == 155) {
-                        DBG("[LY = " << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
+                        DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
+                        dbg->frame_cnt++;
+
+
+                        // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
+                        mem->set(0xfffa, 0);
                     }
 
                     mem->set(REG_LY, new_LY, 1);

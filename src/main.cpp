@@ -106,7 +106,7 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
 // Poll for events
 // SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
 // Loop exits once all events are popped off the q
-void sdl_main_loop(bool& main_loop_running) {
+void sdl_event_loop(bool& main_loop_running) {
     if (CPU_ONLY) return;
 
     SDL_Event event;
@@ -168,7 +168,8 @@ int emulate(int argc, char* argv[]) {
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
     // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
-    rom_path = "test-roms/graphics-test-roms/color_bands.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
+    rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -202,16 +203,20 @@ int emulate(int argc, char* argv[]) {
 
     // bool halt_cpu = false;      // From CPU when HALT instruction executed
     print ("Starting main loop\n\n");
-    debug_file << "Starting main loop" << std::endl;
+    #ifdef DEBUG_MODE
+        std::cout << "Debug messages enabled." << std::endl;
+        debug_file << "Starting main loop" << std::endl;
+    #else
+        debug_file << "Debug messages disabled." << std::endl;
+    #endif
     
     bool main_loop_running = true;
-    int hit_bp_1 = false;
     while (main_loop_running) {  // main loop
 
         // SDL Main Loop - Polls and services SDL Events like interacting with App window
         // In CPU Only mode, this function exits immediately and main_loop_running will never dsiable
         // So program will run indefinitely (or until forever loop detected??)
-        sdl_main_loop(main_loop_running);
+        sdl_event_loop(main_loop_running);
 
         if (lcd->frame_ready) {
             lcd->draw_frame();

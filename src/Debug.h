@@ -24,6 +24,7 @@ public:
 
     unsigned long instr_cnt = 0;
     unsigned long mcycle_cnt = 0;
+    unsigned long frame_cnt = 0;
     long num_steps_left;
     bool run;
     uint8_t tgt_instr;
@@ -34,6 +35,7 @@ public:
     bool disable_interrupts = false;
 
     Debug();
+    void set_breakpoint(std::string msg);
     void debugger_break(CPU &cpu);
 
 };

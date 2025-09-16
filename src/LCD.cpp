@@ -37,7 +37,9 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
     uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
     framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
-    dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
+    if (dbg->frame_cnt == 1) {
+        dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
+    }
 
     // Manage frame buffer pointers
     if (framebuffer_write_ptr_x == (SCREEN_WIDTH-1)) {
@@ -139,6 +141,8 @@ void LCD::draw_frame() {
 
     // Show it
     SDL_RenderPresent(renderer);
+
+    dbg->set_breakpoint("draw_frame");
 }
 
 

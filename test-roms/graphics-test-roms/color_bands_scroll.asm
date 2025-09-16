@@ -2,12 +2,12 @@
 ; ------------------------------------------------
 ; Compile with RGBASM
 ; cd ./test-roms/graphics-test-roms
-; rgbasm -o color_bands.obj color_bands.asm
-; rgblink -o color_bands.gb color_bands.obj
-; rgbfix -v -p 0 color_bands.gb
+; rgbasm -o color_bands_scroll.obj color_bands_scroll.asm
+; rgblink -o color_bands_scroll.gb color_bands_scroll.obj
+; rgbfix -v -p 0 color_bands_scroll.gb
 ; ------------------------------------------------
 ; ------------------------------------------------
-;   color_bands.asm ---
+;   color_bands_scroll.asm ---
 ;     Splits the screen into 4 horizontal bands:
 ;     White, Light Grey, Dark Grey, and Black
 ; ------------------------------------------------
@@ -79,13 +79,21 @@ RowLoop:
     
 
     ; --- decide tile index based on row ---
-    cp 36               ; check row < 36?
+    cp 32               ; check row < 32?
     jr c, RowTile0
-    cp 72               ; check row < 72 ?
+    cp 64               ; check row < 64 ?
     jr c, RowTile1
-    cp 108              ; check row < 108?
+    cp 96               ; check row < 96?
     jr c, RowTile2
-    jr RowTile3 ; else (row >= 108)
+    cp 128              ; check row < 128?
+    jr c, RowTile3
+    cp 160              ; check row < 160?
+    jr c, RowTile2
+    cp 192              ; check row < 192?
+    jr c, RowTile1
+    cp 224              ; check row < 224?
+    jr c, RowTile0
+    jr RowTile1 ; else (224 >= row < 256)
 
 
 RowTile0:
@@ -127,7 +135,29 @@ ExitLoop:
 
 
 Forever:
-    jr Forever
+    ; increment SCY - continuously scroll downwards
+    ; How to wait for each VBLANK period before incrementing SCY?
+
+PollVBLANK1:
+    ld a, [$fffa]
+    cp 1
+    jr z, incrSCY
+    jr PollVBLANK1
+
+PollVBLANK0:
+    ld a, [$fffa]
+    cp 0
+    jr z, PollVBLANK1
+    jr PollVBLANK0
+
+
+incrSCY:
+    ld a, [$ff42]
+    inc a
+    ld [$ff42], a
+    jr PollVBLANK0
+
+
 
 
 ; Subroutine to Copy Predefined tile data into VRAM

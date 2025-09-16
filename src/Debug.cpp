@@ -20,7 +20,10 @@ Debug::Debug() {
 
 void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
     // std::string dbg_cmd;
-    std::getline(std::cin, dbg_cmd);
+    if (!std::getline(std::cin, dbg_cmd)) {
+        printx("\nExiting...\n");
+        std::exit(0);   // Exit program
+    }
 
     std::istringstream iss(dbg_cmd);
     
@@ -31,12 +34,19 @@ void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
     }
 }
 
+void Debug::set_breakpoint(std::string msg) {
+    bp_info.breakpoint = true;
+    bp_info.msg = msg;
+}
+
 
 // Move this to a separate file so I can keep track of all the global vars easier
 // Can also use the vars to interract with the program automatically
 // num_steps_left, breakpoint, run, clk_cnt, tg_instr etc etc
 void Debug::debugger_break(CPU &cpu) {
     instr_cnt++;
+
+    if (DEBUGGER == false) return;
 
     bool exit_debugger = false;
     bool break_execution = true;
@@ -68,7 +78,7 @@ void Debug::debugger_break(CPU &cpu) {
     }
     // If breakpoint is triggered in code, break execution (priority = 1)
     if (!bp_info.disable_breakpoints && bp_info.breakpoint) {
-        printx ("Hit breakpoint! \"%s\"\n", bp_info.msg.c_str());
+        printx ("Hit breakpoint! \"%s\" @ mcycle=%0lu\n", bp_info.msg.c_str(), mcycle_cnt);
         break_execution = true;
         bp_info.breakpoint = false;
         num_steps_left = 0;
@@ -76,7 +86,6 @@ void Debug::debugger_break(CPU &cpu) {
         tgt_pc.valid = false;
     }
 
-    if (DEBUGGER == false) break_execution = false;
 
     // Break CPU execution for debugging
     if (break_execution) {

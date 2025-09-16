@@ -15,7 +15,7 @@ else
 endif
 
 # CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
+CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
 CXXDBGFLAGS = -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address $(SDL_CFLAGS)
 LDDBGFLAGS = -g -O0 -fsanitize=address -rdynamic
 
@@ -47,6 +47,7 @@ gdb:
 link: compile 
 	@$(CXX) bin/main.o bin/Memory.o bin/CPU.o bin/PPU.o bin/Peripherals.o bin/Debug.o bin/LCD.o -o myprogram $(SDL_LDFLAGS)
 
+# debug: CXXFLAGS += -DDEBUG_MODE
 debug: clean link 
 	./myprogram --debug
 
