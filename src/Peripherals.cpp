@@ -122,7 +122,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                         break;
                 }
                 if (disable_prints == false) {
-                    debug_file << "TEST Incremented TIMA; Instr_cnt: " << dbg->instr_cnt << " mcycle_cnt: " << dbg->mcycle_cnt << std::endl;
+                    DBG("TEST Incremented TIMA; Instr_cnt: " << dbg->instr_cnt << " mcycle_cnt: " << dbg->mcycle_cnt << std::endl);
                 }
                 // debug_file.flush();
 
@@ -200,7 +200,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x40;
                     mem->memory[IF] &= ~VBLANK_BIT;  // Clear IF VBLANK Bit
                     intr_triggered = true;
-                    debug_file << "Triggering VBLANK interrupt @ clk num = " << dbg->instr_cnt << std::endl; 
+                    DBG("Triggering VBLANK interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & LCD_BIT) {
                     print("check_interrupts: Triggering LCD/STAT interrupt\n");
                     reset_ime();
@@ -213,7 +213,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x50;
                     mem->memory[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
                     intr_triggered = true;
-                    debug_file << "Triggering TIMER interrupt @ clk num = " << dbg->instr_cnt << std::endl; 
+                    DBG("Triggering TIMER interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & SERIAL_BIT) {
                     print("check_interrupts: Triggering SERIAL interrupt\n");
                     reset_ime();

@@ -20,10 +20,10 @@
 
 
 void FIFO::print_contents() {
-    debug_file << "pixel_fifo contents..." << std::endl;
+    DBG("pixel_fifo contents..." << std::endl);
     for (int i = 0; i < FIFO_DEPTH; i++) {
-        debug_file << "     pixels[" << i << "] = {color=" << static_cast<int>(pixels[i].color)
-                    << "; valid=" << pixels[i].valid << "}" << std::endl;
+        DBG("     pixels[" << i << "] = {color=" << static_cast<int>(pixels[i].color)
+                    << "; valid=" << pixels[i].valid << "}" << std::endl);
     }
 }
 
@@ -101,8 +101,8 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
         }
 
         if (addr == REG_LCDC) {
-            debug_file << "Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val) 
-                        << " @ mcycle = " << dbg->mcycle_cnt << std::endl;
+            DBG("Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val) 
+                        << " @ mcycle = " << dbg->mcycle_cnt << std::endl);
         }
 
         mem->memory[addr] = val;
@@ -243,7 +243,7 @@ void PPU::ppu_tick(int mcycles){
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     if (dbg->mcycle_cnt >= 20000000) {
         print ("Run for enough time. Exit\n");
-        debug_file << "Run for enough time. Exit" << std::endl;
+        DBG("Run for enough time. Exit" << std::endl);
         std::exit(EXIT_SUCCESS);
     }
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

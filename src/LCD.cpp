@@ -95,7 +95,7 @@ void LCD::draw_frame() {
     // While this function will work with streaming textures, for optimization reasons you may not get the pixels back if you lock the texture afterward.
     // Add these checks:
     if (!texture) {
-        debug_file << "Error: texture is NULL\n" << std::endl;
+        DBG("Error: texture is NULL\n" << std::endl);
         return;
     }
 

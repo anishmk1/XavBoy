@@ -115,7 +115,7 @@ void sdl_event_loop(bool& main_loop_running) {
         if (event.type == SDL_QUIT) {
             main_loop_running = false; // Window closed
 
-            debug_file << "CLOSING SDL WINDOW" << std::endl;
+            DBG("CLOSING SDL WINDOW" << std::endl);
             lcd->close_window();
         }
     }
@@ -205,9 +205,9 @@ int emulate(int argc, char* argv[]) {
     print ("Starting main loop\n\n");
     #ifdef DEBUG_MODE
         std::cout << "Debug messages enabled." << std::endl;
-        debug_file << "Starting main loop" << std::endl;
+        DBG("Starting main loop" << std::endl);
     #else
-        debug_file << "Debug messages disabled." << std::endl;
+        DBG("Debug messages disabled." << std::endl);
     #endif
     
     bool main_loop_running = true;
@@ -290,8 +290,10 @@ int main(int argc, char* argv[]) {
 
     // setup_serial_output();
     // Separate debug log file
+#ifdef DEBUG_MODE
     debug_file.open("logs/debug.log");
     pixel_map.open("logs/pixel_map.log");
+#endif
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
