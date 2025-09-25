@@ -49,10 +49,6 @@ public:
     Reg regs[NUM_REGS];
     Memory *mem;
 
-    uint16_t debug0;
-    uint16_t debug1;
-    uint16_t debug2;
-
     uint16_t get(r16_index_t r16);
     uint8_t get(r8_index_t r8);
     uint16_t get(r16mem_index_t r16mem, bool modify=false);
@@ -76,8 +72,8 @@ public:
 
     InterruptInfo intrpt_info;      // FIXME: This should be in private
 
-    bool halt_mode;
-    bool stop_mode;
+    bool halt_mode = 0;
+    bool stop_mode = 0;
 
     CPU (Memory *mem);
     int execute();

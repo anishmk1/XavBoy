@@ -165,22 +165,29 @@ void PPU::fetch_pixel(int pixel_x) {
 
     // Static => Only re-fetch tile_data when pixel_x hits a new tile
     static std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
+    static uint8_t scy, scx;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     uint8_t ly = mem->get(REG_LY);
     uint8_t color_palette = mem->get(REG_BGP);
-    uint8_t scy = mem->get(REG_SCY);
-    uint8_t scx = mem->get(REG_SCX);
 
     // New tile - re-fetch tile data
     if (pixel_x % 8 == 0) {
 
-        int tile_x = pixel_x / 8;
-
-        // Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
-        uint16_t viewport_top_left_addr = 0x9800 + (scy * 32) + scx;    // 32 = number of horiz tiles in map
+        // The scroll registers are re-read on each tile fetch
+        if (pixel_x == 0) {
+            scy = mem->get(REG_SCY);
+            scx = mem->get(REG_SCX);
+        } else {
+            scy = mem->get(REG_SCY);
+            scx |= (mem->get(REG_SCX) & 0xf8);  // Do not update bottom 3 bits of scx mid-scanline
+        }
 
         // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
-        uint16_t tile_id_addr = viewport_top_left_addr + (ly * 32) + tile_x;
+        // Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
+        int scroll_adj_tile_ofst_x = (scx + pixel_x) / 8;
+        int scroll_adj_tile_ofst_y = (scy + ly) / 8;
+        uint16_t tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
+
         uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
 
         // Then fetch what that tile looks like from Memory.
@@ -196,7 +203,7 @@ void PPU::fetch_pixel(int pixel_x) {
         DBG( std::endl);
         DBG( std::endl);
         DBG( "      New tile - fetching info below" << std::endl);
-        DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
+        // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
         DBG( "      tile_id = " << static_cast<int>(tile_id) << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
         std::string debug_str = "";
@@ -343,6 +350,7 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
+                        dbg->log_frame_timing();
                         dbg->frame_cnt++;
 
 

@@ -253,7 +253,6 @@
         }
 
         // Interrupt handling
-        rf.debug0 = mmio->IME;
         set_new_interrupts();
         if (handle_interrupts()) {
             // if (intrpt_info.wait_cycles > 0) return;

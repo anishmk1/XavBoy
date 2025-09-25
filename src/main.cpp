@@ -32,6 +32,7 @@ LCD *lcd;
 std::ofstream logFile;
 std::ofstream debug_file;
 std::ofstream pixel_map;
+std::ofstream timestamp_log;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
@@ -169,7 +170,8 @@ int emulate(int argc, char* argv[]) {
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
     // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
-    rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
+    rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -216,11 +218,11 @@ int emulate(int argc, char* argv[]) {
         // SDL Main Loop - Polls and services SDL Events like interacting with App window
         // In CPU Only mode, this function exits immediately and main_loop_running will never dsiable
         // So program will run indefinitely (or until forever loop detected??)
-        sdl_event_loop(main_loop_running);
+        // sdl_event_loop(main_loop_running);
 
-        if (lcd->frame_ready) {
-            lcd->draw_frame();
-        }
+        // if (lcd->frame_ready) {
+        //     lcd->draw_frame();
+        // }
 
         // if ((mem->get(REG_LCDC) & LCDC_ENABLE_BIT) != 0) {
         //     dbg->bp_info.breakpoint = true;
@@ -245,9 +247,9 @@ int emulate(int argc, char* argv[]) {
         // }
 
 
-        cpu->rf.debug0 = mmio->IME;
-        cpu->rf.debug1 = mmio->IME_ff[0];
-        cpu->rf.debug2 = mmio->IME_ff[1];
+        // cpu->rf.debug0 = mmio->IME;
+        // cpu->rf.debug1 = mmio->IME_ff[0];
+        // cpu->rf.debug2 = mmio->IME_ff[1];
         dbg->debugger_break(*cpu);
 
 
@@ -268,7 +270,6 @@ int emulate(int argc, char* argv[]) {
             }
 
             // More Interrupt handling - this time when handling halted Cpu
-            cpu->rf.debug0 = mmio->IME;
             if (mmio->check_interrupts(cpu->intrpt_info.handler_addr, 1)) {
                 cpu->intrpt_info.interrupt_valid = true;
                 cpu->intrpt_info.wait_cycles = 1;
@@ -294,6 +295,7 @@ int main(int argc, char* argv[]) {
     debug_file.open("logs/debug.log");
     pixel_map.open("logs/pixel_map.log");
 #endif
+    timestamp_log.open("timestamps.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
@@ -304,7 +306,14 @@ int main(int argc, char* argv[]) {
     dbg         = new Debug();
     lcd         = new LCD();
 
-    lcd->init_screen();
+    // lcd->init_screen();
      
     emulate(argc, argv);
+
+    delete lcd;
+    delete dbg;
+    delete ppu;
+    delete mmio;
+    delete mem;
+    pthread_exit(NULL);
 }

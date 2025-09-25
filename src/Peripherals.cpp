@@ -43,6 +43,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
     MMIO::MMIO () {
         system_counter = 0;
+        reset_ime();
     }
 
     uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val) {
@@ -174,78 +175,64 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
 
 
     bool MMIO::check_interrupts(uint16_t &intr_handler_addr, bool cpu_halted) {
-        print("check_interrupts: Entered function\n");
         // debug_file << "check_interrupts: Entered function @ clk num = " << dbg->instr_cnt << std::endl;
         if (dbg->disable_interrupts) {
-            print("check_interrupts: Interrupts are disabled by debugger\n");
+
             return false;
         }
 
         bool intr_triggered = false;
         uint8_t ie_and_if = mem->memory[IF] & mem->memory[IE];
 
-        print("check_interrupts: IF=0x%02x, IE=0x%02x, IF&IE=0x%02x, IME=%d, cpu_halted=%d\n",
-              mem->memory[IF], mem->memory[IE], ie_and_if, IME, cpu_halted);
+        // print("check_interrupts: IF=0x%02x, IE=0x%02x, IF&IE=0x%02x, IME=%d, cpu_halted=%d\n",
+        //       mem->memory[IF], mem->memory[IE], ie_and_if, IME, cpu_halted);
 
         if (ie_and_if) {
-            print("check_interrupts: At least one interrupt is pending and enabled\n");
             // debug_file << "Inside ie_and_if" << std::endl; 
             // WAKE CPU
             if (IME) {
-                print("check_interrupts: IME is set, checking which interrupt to trigger\n");
                 // setup interrupt handler for execution
                 if (ie_and_if & VBLANK_BIT) {
-                    print("check_interrupts: Triggering VBLANK interrupt\n");
                     reset_ime();
                     intr_handler_addr = 0x40;
                     mem->memory[IF] &= ~VBLANK_BIT;  // Clear IF VBLANK Bit
                     intr_triggered = true;
                     DBG("Triggering VBLANK interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & LCD_BIT) {
-                    print("check_interrupts: Triggering LCD/STAT interrupt\n");
                     reset_ime();
                     intr_handler_addr = 0x48;
                     mem->memory[IF] &= ~LCD_BIT;  // Clear IF LCD/STAT Bit
                     intr_triggered = true;
                 } else if (ie_and_if & TIMER_BIT) {
-                    print("check_interrupts: Triggering TIMER interrupt\n");
                     reset_ime();
                     intr_handler_addr = 0x50;
                     mem->memory[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
                     intr_triggered = true;
                     DBG("Triggering TIMER interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & SERIAL_BIT) {
-                    print("check_interrupts: Triggering SERIAL interrupt\n");
                     reset_ime();
                     intr_handler_addr = 0x58;
                     mem->memory[IF] &= ~SERIAL_BIT;  // Clear IF Serial Bit
                     intr_triggered = true;
                 } else if (ie_and_if & JOYPAD_BIT) {
-                    print("check_interrupts: Triggering JOYPAD interrupt\n");
                     reset_ime();
                     intr_handler_addr = 0x60;
                     mem->memory[IF] &= ~JOYPAD_BIT;  // Clear IF Joypad Bit
                     intr_triggered = true;
                 } else {
-                    print("check_interrupts: No known interrupt bit set in IF&IE\n");
                 }
             } else {
-                print("check_interrupts: IME is NOT set\n");
                 if (cpu_halted) {
-                    print("check_interrupts: CPU is halted but IME is not set\n");
                     // can do further processing of the "2 distinct cases"
                 }
                 // else (i.e IME not set but regular execution of CPU, do nothing)
             }
         } else {
-            print("check_interrupts: No interrupts are pending and enabled\n");
         }
 
         if (intr_triggered) {
-            print("check_interrupts: Interrupt was triggered, handler address set to 0x%04x\n", intr_handler_addr);
             return true;
         }
 
-        print("check_interrupts: No interrupt was triggered\n");
         return false;
     }

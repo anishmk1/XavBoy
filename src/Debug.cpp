@@ -16,6 +16,8 @@ Debug::Debug() {
     tgt_instr = 0xd3;   // Init to some illegal value that I would never target
     bp_info.breakpoint = false;
     bp_info.disable_breakpoints = false;
+
+    last_frame_time = std::chrono::high_resolution_clock::now();
 }
 
 void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
@@ -148,9 +150,9 @@ void Debug::debugger_break(CPU &cpu) {
                     printx ("Please provide a 4 digit hex address with m/md: mxxxx\n");
                 }
             } else if (dbg_cmd[0] == 'd') {
-                if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", cpu.rf.debug0);
-                else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", cpu.rf.debug1);
-                else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", cpu.rf.debug2);
+                // if (dbg_cmd[1] == '0') printx ("debug0 = 0x%0x\n", cpu.rf.debug0);
+                // else if (dbg_cmd[1] == '1') printx ("debug1 = 0x%0x\n", cpu.rf.debug1);
+                // else if (dbg_cmd[1] == '2') printx ("debug2 = 0x%0x\n", cpu.rf.debug2);
             } else if (dbg_cmd[0] == 'i' && dbg_cmd[1] == 'd') {
                 disable_interrupts = !disable_interrupts;
                 printx ("disable_interrupts <= %0d\n", disable_interrupts);
@@ -169,4 +171,20 @@ void Debug::debugger_break(CPU &cpu) {
         } while (exit_debugger == false);
 
     }
+}
+
+void Debug::log_frame_timing() {
+    auto current_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(current_time - last_frame_time);
+
+    double duration_ns = duration.count();
+    double duration_ms = duration_ns / 1000000.0;
+
+    if (duration_ms >= 1.0) {
+        timestamp_log << "Frame " << frame_cnt << ": " << duration_ms << " ms" << std::endl;
+    } else {
+        timestamp_log << "Frame " << frame_cnt << ": " << duration_ns << " ns" << std::endl;
+    }
+
+    last_frame_time = current_time;
 }

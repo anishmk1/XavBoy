@@ -3,6 +3,8 @@
 #define DEBUG_H
 
 #include <string>
+#include <chrono>
+#include <fstream>
 #include "PPU.h"
 
 class CPU;
@@ -34,9 +36,12 @@ public:
 
     bool disable_interrupts = false;
 
+    std::chrono::high_resolution_clock::time_point last_frame_time;
+
     Debug();
     void set_breakpoint(std::string msg);
     void debugger_break(CPU &cpu);
+    void log_frame_timing();
 
 };
 

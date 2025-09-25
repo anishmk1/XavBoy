@@ -33,6 +33,7 @@ constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 extern std::ofstream logFile;
 extern std::ofstream debug_file;
 extern std::ofstream pixel_map;
+extern std::ofstream timestamp_log;
 extern bool verbose;
 extern bool disable_prints;
 extern bool DEBUGGER;
@@ -60,15 +61,20 @@ extern LCD *lcd;
             printf(__VA_ARGS__);                    \
     } while (0)
 
-#define print(...)                             \
-    do {                                       \
-        if (disable_prints == 0)               \
-            printf(__VA_ARGS__);               \
-    } while (0)
+/**
+// #define print(...)                             \
+//     do {                                       \
+//         if (disable_prints == 0)               \
+//             printf(__VA_ARGS__);               \
+//     } while (0)
+ */
+
 
 #ifdef DEBUG_MODE
+    #define print(...) printf(__VA_ARGS__)
     #define DBG(x) do { debug_file << x; } while(0)
 #else
+    #define print(...) do {} while(0)
     #define DBG(x) do {} while(0)
 #endif
 
