@@ -45,6 +45,8 @@ const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how i
 const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
 
 
+// FIXME:: Just use a simple ifstream/fread() into a. I decided on mmap before realizing I needed to load the
+// entire rom into memory anyway.. Maybe implementing MBCs will change this at some point.. But for now keep this simple
 uint8_t *open_rom(const char* file_path, size_t *file_size) {
     int fd = open(file_path, O_RDONLY);
     if (fd == -1) {
@@ -168,10 +170,10 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb";
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
-    // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
+    rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
-    rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -218,11 +220,31 @@ int emulate(int argc, char* argv[]) {
         // SDL Main Loop - Polls and services SDL Events like interacting with App window
         // In CPU Only mode, this function exits immediately and main_loop_running will never dsiable
         // So program will run indefinitely (or until forever loop detected??)
-        // sdl_event_loop(main_loop_running);
+        sdl_event_loop(main_loop_running);
 
-        // if (lcd->frame_ready) {
-        //     lcd->draw_frame();
-        // }
+        dbg->perf.num_main_loops++;
+
+        if (lcd->frame_ready) {
+            auto before_lcd = std::chrono::high_resolution_clock::now();
+
+            lcd->draw_frame();
+            dbg->perf.num_main_loops = 0;
+
+            auto after_lcd = std::chrono::high_resolution_clock::now();
+            // dbg->log_duration(before_lcd, after_lcd, "LCD Frame draw time = ");
+            auto duration = std::chrono::duration<double, std::milli>(after_lcd - before_lcd);
+            double duration_ms = duration.count();
+
+            timestamp_log << "   LCD Frame draw time = " 
+                        << std::fixed << std::setprecision(3) << duration_ms 
+                        << " ms" << std::endl;
+
+
+            // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(after_lcd - before_lcd);
+            // double duration_ms = duration.count();
+            // timestamp_log << "   LCD Frame draw time = " << duration_ms << " ms" << std::endl;
+            
+        }
 
         // if ((mem->get(REG_LCDC) & LCDC_ENABLE_BIT) != 0) {
         //     dbg->bp_info.breakpoint = true;
@@ -287,6 +309,30 @@ int emulate(int argc, char* argv[]) {
     return 0;
 }
 
+/**
+ * PERFORMACE INVESTIGATION:
+ *      Need more performance metrics
+ *      For each frame,
+ *          how many main loops are executed?
+ *          For each main loop,
+ *              how much time was spent in the CPU execute logic
+ *              How much time was spent in ppu_step function?
+ *          How much time was spent in lcd draw frame?
+ * 
+ *      Aggregate metrics:
+ *      At the end of sim, 
+ *      how much total % time spent in CPU? PPU? LCD?
+ *      
+ */
+
+
+
+
+
+
+
+
+
 int main(int argc, char* argv[]) {
 
     // setup_serial_output();
@@ -295,7 +341,7 @@ int main(int argc, char* argv[]) {
     debug_file.open("logs/debug.log");
     pixel_map.open("logs/pixel_map.log");
 #endif
-    timestamp_log.open("timestamps.log");
+    timestamp_log.open("logs/timestamps.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc
@@ -306,7 +352,7 @@ int main(int argc, char* argv[]) {
     dbg         = new Debug();
     lcd         = new LCD();
 
-    // lcd->init_screen();
+    lcd->init_screen();
      
     emulate(argc, argv);
 

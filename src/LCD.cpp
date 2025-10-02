@@ -70,6 +70,8 @@ void LCD::close_window() {
     // Clean up
     SDL_DestroyWindow(window);
     SDL_Quit();
+
+    // std::exit(EXIT_SUCCESS);
 }
 
 void LCD::print_framebuffer() {

@@ -17,6 +17,8 @@ Debug::Debug() {
     bp_info.breakpoint = false;
     bp_info.disable_breakpoints = false;
 
+    perf.num_main_loops = 0;
+
     last_frame_time = std::chrono::high_resolution_clock::now();
 }
 
@@ -185,6 +187,18 @@ void Debug::log_frame_timing() {
     } else {
         timestamp_log << "Frame " << frame_cnt << ": " << duration_ns << " ns" << std::endl;
     }
+    timestamp_log << "   num main loops = " << this->perf.num_main_loops << std::endl;
 
     last_frame_time = current_time;
+}
+
+void Debug::log_duration(std::chrono::time_point<std::chrono::high_resolution_clock> before,
+                         std::chrono::time_point<std::chrono::high_resolution_clock> after,
+                         std::string msg) {
+    auto duration = std::chrono::duration<double, std::milli>(after - before);
+    double duration_ms = duration.count();
+
+    timestamp_log << msg
+                << std::fixed << std::setprecision(3) << duration_ms 
+                << " ms" << std::endl;
 }

@@ -20,6 +20,11 @@ typedef struct {
     bool valid;
 } TargetPC;
 
+typedef struct {
+    int num_main_loops;
+    std::chrono::high_resolution_clock::time_point curr_frame_draw_time;
+} PerfMetrics;
+
 class Debug {
 public:
     Color last_framebuffer[144][160];
@@ -33,6 +38,7 @@ public:
     // uint8_t tgt_pc;
     TargetPC tgt_pc;
     BreakpointInfo bp_info;
+    PerfMetrics perf;
 
     bool disable_interrupts = false;
 
@@ -42,6 +48,7 @@ public:
     void set_breakpoint(std::string msg);
     void debugger_break(CPU &cpu);
     void log_frame_timing();
+    void log_duration(std::chrono::time_point<std::chrono::high_resolution_clock> before, std::chrono::time_point<std::chrono::high_resolution_clock> after, std::string msg);
 
 };
 

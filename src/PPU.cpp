@@ -354,8 +354,8 @@ void PPU::ppu_tick(int mcycles){
                         dbg->frame_cnt++;
 
 
-                        // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
-                        mem->set(0xfffa, 0);
+                        // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
+                        // mem->set(0xfffa, 0);
                     }
 
                     mem->set(REG_LY, new_LY, 1);
