@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstdio>
 #include <sstream>
+#include <iomanip>
 
 #include "main.h"
 #include "CPU.h"
@@ -18,8 +19,18 @@ Debug::Debug() {
     bp_info.disable_breakpoints = false;
 
     perf.num_main_loops = 0;
+    perf.frame_cpu_time_ms = 0.0;
+    perf.frame_ppu_time_ms = 0.0;
+    perf.frame_mmio_time_ms = 0.0;
+    perf.frame_lcd_time_ms = 0.0;
+    perf.frame_sdl_events_time_ms = 0.0;
+    perf.frame_debugger_time_ms = 0.0;
+    perf.frame_interrupt_time_ms = 0.0;
+    perf.frame_other_time_ms = 0.0;
+    perf.csv_logging_enabled = true;  // Enable CSV logging by default
 
-    last_frame_time = std::chrono::high_resolution_clock::now();
+    perf.frame_start_time = std::chrono::high_resolution_clock::now();
+    perf.last_section_time = std::chrono::high_resolution_clock::now();
 }
 
 void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
@@ -175,30 +186,114 @@ void Debug::debugger_break(CPU &cpu) {
     }
 }
 
-void Debug::log_frame_timing() {
-    auto current_time = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(current_time - last_frame_time);
 
-    double duration_ns = duration.count();
-    double duration_ms = duration_ns / 1000000.0;
+// CSV performance logging implementation
+void Debug::init_csv_logging() {
+    if (!perf.csv_logging_enabled) return;
 
-    if (duration_ms >= 1.0) {
-        timestamp_log << "Frame " << frame_cnt << ": " << duration_ms << " ms" << std::endl;
-    } else {
-        timestamp_log << "Frame " << frame_cnt << ": " << duration_ns << " ns" << std::endl;
+    static bool csv_initialized = false;
+    if (!csv_initialized) {
+        write_csv_header();
+        csv_initialized = true;
     }
-    timestamp_log << "   num main loops = " << this->perf.num_main_loops << std::endl;
-
-    last_frame_time = current_time;
 }
 
-void Debug::log_duration(std::chrono::time_point<std::chrono::high_resolution_clock> before,
-                         std::chrono::time_point<std::chrono::high_resolution_clock> after,
-                         std::string msg) {
-    auto duration = std::chrono::duration<double, std::milli>(after - before);
-    double duration_ms = duration.count();
+void Debug::start_frame_timing() {
+    if (!perf.csv_logging_enabled) return;
 
-    timestamp_log << msg
-                << std::fixed << std::setprecision(3) << duration_ms 
-                << " ms" << std::endl;
+    perf.frame_start_time = std::chrono::high_resolution_clock::now();
+    perf.frame_cpu_time_ms = 0.0;
+    perf.frame_ppu_time_ms = 0.0;
+    perf.frame_mmio_time_ms = 0.0;
+    perf.frame_lcd_time_ms = 0.0;
+    perf.frame_sdl_events_time_ms = 0.0;
+    perf.frame_debugger_time_ms = 0.0;
+    perf.frame_interrupt_time_ms = 0.0;
+    perf.frame_other_time_ms = 0.0;
+
+    perf.last_section_time = perf.frame_start_time;
+}
+
+void Debug::log_component_timing(const std::string& component, double time_ms) {
+    if (!perf.csv_logging_enabled) return;
+
+    if (component == "cpu") {
+        perf.frame_cpu_time_ms += time_ms;
+    } else if (component == "ppu") {
+        perf.frame_ppu_time_ms += time_ms;
+    } else if (component == "mmio") {
+        perf.frame_mmio_time_ms += time_ms;
+    } else if (component == "lcd") {
+        perf.frame_lcd_time_ms += time_ms;
+    } else if (component == "sdl_events") {
+        perf.frame_sdl_events_time_ms += time_ms;
+    } else if (component == "debugger") {
+        perf.frame_debugger_time_ms += time_ms;
+    } else if (component == "interrupt") {
+        perf.frame_interrupt_time_ms += time_ms;
+    } else if (component == "other") {
+        perf.frame_other_time_ms += time_ms;
+    }
+}
+
+void Debug::finalize_frame_timing() {
+    if (!perf.csv_logging_enabled) return;
+
+    auto frame_end_time = std::chrono::high_resolution_clock::now();
+    auto total_duration = std::chrono::duration<double, std::milli>(frame_end_time - perf.frame_start_time);
+
+    FramePerfData frame_data;
+    frame_data.cpu_time_ms = perf.frame_cpu_time_ms;
+    frame_data.ppu_time_ms = perf.frame_ppu_time_ms;
+    frame_data.mmio_time_ms = perf.frame_mmio_time_ms;
+    frame_data.lcd_time_ms = perf.frame_lcd_time_ms;
+    frame_data.sdl_events_time_ms = perf.frame_sdl_events_time_ms;
+    frame_data.debugger_time_ms = perf.frame_debugger_time_ms;
+    frame_data.interrupt_time_ms = perf.frame_interrupt_time_ms;
+    frame_data.other_time_ms = perf.frame_other_time_ms;
+    frame_data.total_frame_time_ms = total_duration.count();
+
+    write_csv_row(frame_data);
+}
+
+void Debug::write_csv_header() {
+    std::ofstream perf_csv("logs/performance.csv", std::ios::out);
+    if (perf_csv.is_open()) {
+        perf_csv << "frame_number,cpu_time_ms,ppu_time_ms,mmio_time_ms,lcd_time_ms,sdl_events_time_ms,debugger_time_ms,interrupt_time_ms,other_time_ms,total_frame_time_ms\n";
+        perf_csv.close();
+    }
+}
+
+void Debug::write_csv_row(const FramePerfData& data) {
+    std::ofstream perf_csv("logs/performance.csv", std::ios::app);
+    if (perf_csv.is_open()) {
+        perf_csv << frame_cnt << ","
+                << std::fixed << std::setprecision(4)
+                << data.cpu_time_ms << ","
+                << data.ppu_time_ms << ","
+                << data.mmio_time_ms << ","
+                << data.lcd_time_ms << ","
+                << data.sdl_events_time_ms << ","
+                << data.debugger_time_ms << ","
+                << data.interrupt_time_ms << ","
+                << data.other_time_ms << ","
+                << data.total_frame_time_ms << "\n";
+        perf_csv.close();
+    }
+}
+
+// Detailed section timing methods
+void Debug::start_section_timing() {
+    if (!perf.csv_logging_enabled) return;
+    perf.last_section_time = std::chrono::high_resolution_clock::now();
+}
+
+void Debug::end_section_timing(const std::string& section_name) {
+    if (!perf.csv_logging_enabled) return;
+
+    auto current_time = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration<double, std::milli>(current_time - perf.last_section_time);
+
+    log_component_timing(section_name, duration.count());
+    perf.last_section_time = current_time;
 }

@@ -21,8 +21,36 @@ typedef struct {
 } TargetPC;
 
 typedef struct {
+    double cpu_time_ms;
+    double ppu_time_ms;
+    double mmio_time_ms;
+    double lcd_time_ms;
+    double sdl_events_time_ms;
+    double debugger_time_ms;
+    double interrupt_time_ms;
+    double other_time_ms;
+    double total_frame_time_ms;
+} FramePerfData;
+
+typedef struct {
     int num_main_loops;
     std::chrono::high_resolution_clock::time_point curr_frame_draw_time;
+
+    // Per-frame timing accumulators
+    std::chrono::high_resolution_clock::time_point frame_start_time;
+    double frame_cpu_time_ms;
+    double frame_ppu_time_ms;
+    double frame_mmio_time_ms;
+    double frame_lcd_time_ms;
+    double frame_sdl_events_time_ms;
+    double frame_debugger_time_ms;
+    double frame_interrupt_time_ms;
+    double frame_other_time_ms;
+
+    // For tracking main loop sections
+    std::chrono::high_resolution_clock::time_point last_section_time;
+
+    bool csv_logging_enabled;
 } PerfMetrics;
 
 class Debug {
@@ -42,13 +70,21 @@ public:
 
     bool disable_interrupts = false;
 
-    std::chrono::high_resolution_clock::time_point last_frame_time;
-
     Debug();
     void set_breakpoint(std::string msg);
     void debugger_break(CPU &cpu);
-    void log_frame_timing();
-    void log_duration(std::chrono::time_point<std::chrono::high_resolution_clock> before, std::chrono::time_point<std::chrono::high_resolution_clock> after, std::string msg);
+
+    // CSV performance logging methods
+    void init_csv_logging();
+    void start_frame_timing();
+    void log_component_timing(const std::string& component, double time_ms);
+    void finalize_frame_timing();
+    void write_csv_header();
+    void write_csv_row(const FramePerfData& data);
+
+    // Detailed profiling methods
+    void start_section_timing();
+    void end_section_timing(const std::string& section_name);
 
 };
 

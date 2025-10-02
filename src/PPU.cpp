@@ -350,7 +350,6 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
-                        dbg->log_frame_timing();
                         dbg->frame_cnt++;
 
 

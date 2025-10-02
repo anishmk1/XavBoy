@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <array>
 #include <string>
+#include <iomanip>
 
 #include <cstdint>
 #include <cstdlib>
@@ -32,7 +33,6 @@ LCD *lcd;
 std::ofstream logFile;
 std::ofstream debug_file;
 std::ofstream pixel_map;
-std::ofstream timestamp_log;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
@@ -170,10 +170,10 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_6_debug.gb";
 
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
-    rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
+    // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
-    // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
+    rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -214,36 +214,39 @@ int emulate(int argc, char* argv[]) {
         DBG("Debug messages disabled." << std::endl);
     #endif
     
+    // Initialize CSV logging
+    dbg->init_csv_logging();
+
     bool main_loop_running = true;
+    bool frame_timing_started = false;
+
     while (main_loop_running) {  // main loop
 
-        // SDL Main Loop - Polls and services SDL Events like interacting with App window
-        // In CPU Only mode, this function exits immediately and main_loop_running will never dsiable
-        // So program will run indefinitely (or until forever loop detected??)
-        sdl_event_loop(main_loop_running);
+        // Start frame timing if this is the beginning of a new frame
+        if (!frame_timing_started) {
+            dbg->start_frame_timing();
+            frame_timing_started = true;
+        }
+
+        // SDL events are now polled once per frame (when lcd->frame_ready is true)
+        // instead of every main loop iteration to improve WSL2 performance
 
         dbg->perf.num_main_loops++;
 
         if (lcd->frame_ready) {
-            auto before_lcd = std::chrono::high_resolution_clock::now();
+            // Poll SDL events once per frame for better WSL2 performance
+            dbg->start_section_timing();
+            sdl_event_loop(main_loop_running);
+            dbg->end_section_timing("sdl_events");
 
+            dbg->start_section_timing();
             lcd->draw_frame();
             dbg->perf.num_main_loops = 0;
+            dbg->end_section_timing("lcd");
 
-            auto after_lcd = std::chrono::high_resolution_clock::now();
-            // dbg->log_duration(before_lcd, after_lcd, "LCD Frame draw time = ");
-            auto duration = std::chrono::duration<double, std::milli>(after_lcd - before_lcd);
-            double duration_ms = duration.count();
-
-            timestamp_log << "   LCD Frame draw time = " 
-                        << std::fixed << std::setprecision(3) << duration_ms 
-                        << " ms" << std::endl;
-
-
-            // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(after_lcd - before_lcd);
-            // double duration_ms = duration.count();
-            // timestamp_log << "   LCD Frame draw time = " << duration_ms << " ms" << std::endl;
-            
+            // Finalize frame timing and write to CSV
+            dbg->finalize_frame_timing();
+            frame_timing_started = false;  // Reset for next frame
         }
 
         // if ((mem->get(REG_LCDC) & LCDC_ENABLE_BIT) != 0) {
@@ -272,19 +275,40 @@ int emulate(int argc, char* argv[]) {
         // cpu->rf.debug0 = mmio->IME;
         // cpu->rf.debug1 = mmio->IME_ff[0];
         // cpu->rf.debug2 = mmio->IME_ff[1];
+        dbg->start_section_timing();
         dbg->debugger_break(*cpu);
+        dbg->end_section_timing("debugger");
 
 
         int mcycles = 1;
         if (!cpu->halt_mode) {
+            auto before_cpu = std::chrono::high_resolution_clock::now();
             mcycles = cpu->execute();
+            auto after_cpu = std::chrono::high_resolution_clock::now();
+
+            auto cpu_duration = std::chrono::duration<double, std::milli>(after_cpu - before_cpu);
+            dbg->log_component_timing("cpu", cpu_duration.count());
+
             assert(GAMEBOY_CPU_FREQ_HZ);
             // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
         }
+
+        auto before_ppu = std::chrono::high_resolution_clock::now();
         ppu->ppu_tick(mcycles);
+        auto after_ppu = std::chrono::high_resolution_clock::now();
+
+        auto ppu_duration = std::chrono::duration<double, std::milli>(after_ppu - before_ppu);
+        dbg->log_component_timing("ppu", ppu_duration.count());
+
+        auto before_mmio = std::chrono::high_resolution_clock::now();
         mmio->incr_timers(mcycles);
+        auto after_mmio = std::chrono::high_resolution_clock::now();
+
+        auto mmio_duration = std::chrono::duration<double, std::milli>(after_mmio - before_mmio);
+        dbg->log_component_timing("mmio", mmio_duration.count());
 
         // IE && IF != 0 wakes up CPU from halt mode
+        dbg->start_section_timing();
         if (cpu->halt_mode) {
 
             if (mmio->exit_halt_mode()) {
@@ -297,7 +321,16 @@ int emulate(int argc, char* argv[]) {
                 cpu->intrpt_info.wait_cycles = 1;
             }
         }
-        
+        dbg->end_section_timing("interrupt");
+
+        // Track any remaining unaccounted time in this main loop iteration
+        dbg->start_section_timing();
+        // This captures time for:
+        // - Loop overhead
+        // - Any other operations we haven't specifically measured
+        // - Potential sleeping or waiting that's hidden somewhere
+        dbg->end_section_timing("other");
+
         // if (halt_cpu && mmio->exit_halt_mode(cpu->intrpt_info.handler_addr)) {
         //     halt_cpu = false;
         //     cpu->intrpt_info.interrupt_valid = true;
@@ -341,7 +374,6 @@ int main(int argc, char* argv[]) {
     debug_file.open("logs/debug.log");
     pixel_map.open("logs/pixel_map.log");
 #endif
-    timestamp_log.open("logs/timestamps.log");
 
     // FIXME: Confirm that this automatically frees memory when program finishes
     // use valgrind etc

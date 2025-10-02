@@ -33,7 +33,6 @@ constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 extern std::ofstream logFile;
 extern std::ofstream debug_file;
 extern std::ofstream pixel_map;
-extern std::ofstream timestamp_log;
 extern bool verbose;
 extern bool disable_prints;
 extern bool DEBUGGER;

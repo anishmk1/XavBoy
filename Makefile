@@ -27,8 +27,10 @@ all: clean compile link
 
 build: clean compile link
 
+build_release: clean compile_release link
+
 # release: clean compile_release link
-release: clean compile_release link
+release: build_release
 	@./myprogram --quiet
 
 debug: clean compile link
