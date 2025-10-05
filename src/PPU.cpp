@@ -350,8 +350,6 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
-                        dbg->frame_cnt++;
-
 
                         // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
                         // mem->set(0xfffa, 0);

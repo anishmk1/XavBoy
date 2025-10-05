@@ -16,11 +16,11 @@ endif
 
 # CXX = g++
 CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
-CXXRELFLAGS = -O0 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)		## FIXME: release should be able to have -O2 optimization. If not that means my code has some funky behavior
+CXXRELFLAGS = -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
 # CXXDBGFLAGS = -g -O2 -Wall -Wextra -std=c++17 -fsanitize=address,undefined $(SDL_CFLAGS)
 # LDDBGFLAGS = -g -O2 -fsanitize=address,undefined -rdynamic
-CXXDBGFLAGS = -g -O2 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer $(SDL_CFLAGS)
-LDDBGFLAGS = -g -O2 -fsanitize=address,undefined -fno-omit-frame-pointer -rdynamic
+CXXDBGFLAGS = -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline $(SDL_CFLAGS)
+LDDBGFLAGS = -g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline -rdynamic
 
 all: clean compile link
 	@./myprogram

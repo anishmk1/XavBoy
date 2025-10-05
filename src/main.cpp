@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 #include <iomanip>
+#include <csignal>
 
 #include <cstdint>
 #include <cstdlib>
@@ -109,8 +110,8 @@ void wait_cycles(int mcycles, double clock_frequency_hz) {
 // Poll for events
 // SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
 // Loop exits once all events are popped off the q
-void sdl_event_loop(bool& main_loop_running) {
-    if (CPU_ONLY) return;
+bool sdl_event_loop(bool& main_loop_running) {
+    if (CPU_ONLY) return false;
 
     SDL_Event event;
 
@@ -120,8 +121,13 @@ void sdl_event_loop(bool& main_loop_running) {
 
             DBG("CLOSING SDL WINDOW" << std::endl);
             lcd->close_window();
+
+            // std::exit(EXIT_SUCCESS);
+            return true;
         }
     }
+
+    return false;
 }
 
 //------------------------------------------//
@@ -213,20 +219,20 @@ int emulate(int argc, char* argv[]) {
     #else
         DBG("Debug messages disabled." << std::endl);
     #endif
-    
+
     // Initialize CSV logging
     dbg->init_csv_logging();
 
     bool main_loop_running = true;
-    bool frame_timing_started = false;
+    // bool frame_timing_started = false;
 
     while (main_loop_running) {  // main loop
 
         // Start frame timing if this is the beginning of a new frame
-        if (!frame_timing_started) {
-            dbg->start_frame_timing();
-            frame_timing_started = true;
-        }
+        // if (!frame_timing_started) {
+        //     dbg->start_frame_timing();
+        //     frame_timing_started = true;
+        // }
 
         // SDL events are now polled once per frame (when lcd->frame_ready is true)
         // instead of every main loop iteration to improve WSL2 performance
@@ -235,80 +241,51 @@ int emulate(int argc, char* argv[]) {
 
         if (lcd->frame_ready) {
             // Poll SDL events once per frame for better WSL2 performance
-            dbg->start_section_timing();
-            sdl_event_loop(main_loop_running);
-            dbg->end_section_timing("sdl_events");
+            // dbg->start_section_timing();
+            if (sdl_event_loop(main_loop_running)) {
+                return 0;
+            }
+            // dbg->end_section_timing("sdl_events");
 
-            dbg->start_section_timing();
+            // dbg->start_section_timing();
             lcd->draw_frame();
+            dbg->frame_cnt++;
             dbg->perf.num_main_loops = 0;
-            dbg->end_section_timing("lcd");
+            // dbg->end_section_timing("lcd");
 
             // Finalize frame timing and write to CSV
-            dbg->finalize_frame_timing();
-            frame_timing_started = false;  // Reset for next frame
+            // dbg->finalize_frame_timing();
+            // frame_timing_started = false;  // Reset for next frame
         }
 
-        // if ((mem->get(REG_LCDC) & LCDC_ENABLE_BIT) != 0) {
+        // BREAKPOINT SETTING
+        // if (mem->get(0xfffe) == 0xac) {
         //     dbg->bp_info.breakpoint = true;
-        //     dbg->bp_info.msg = "LCD Turned on";
-        // }
-        // if ((mem->get(0xfffe) == 0xab) && (hit_bp_1 == false)) {
-        //     hit_bp_1 = true;
-        //     dbg->bp_info.breakpoint = true;
-        //     dbg->bp_info.msg = "mem[FFFE] <= 0xAB";
-        // }
-        if (mem->get(0xfffe) == 0xac) {
-            dbg->bp_info.breakpoint = true;
-            dbg->bp_info.msg = "BPT 2: In ExitLoop after enabling LCD";
-        }
-        // if (mem->get(REG_BGP) == 0xe4) {
-        //     dbg->bp_info.breakpoint = true;
-        //     dbg->bp_info.msg = "Palette reg set";
-        // }
-        // if (dbg->mcycle_cnt == 500) {
-        //     dbg->bp_info.breakpoint = true;
-        //     dbg->bp_info.msg = "Hit cycle 500";
+        //     dbg->bp_info.msg = "BPT 2: In ExitLoop after enabling LCD";
         // }
 
-
-        // cpu->rf.debug0 = mmio->IME;
-        // cpu->rf.debug1 = mmio->IME_ff[0];
-        // cpu->rf.debug2 = mmio->IME_ff[1];
-        dbg->start_section_timing();
+        // dbg->start_section_timing();
         dbg->debugger_break(*cpu);
-        dbg->end_section_timing("debugger");
+        // dbg->end_section_timing("debugger");
 
 
         int mcycles = 1;
         if (!cpu->halt_mode) {
-            auto before_cpu = std::chrono::high_resolution_clock::now();
+            // dbg->start_section_timing();
             mcycles = cpu->execute();
-            auto after_cpu = std::chrono::high_resolution_clock::now();
-
-            auto cpu_duration = std::chrono::duration<double, std::milli>(after_cpu - before_cpu);
-            dbg->log_component_timing("cpu", cpu_duration.count());
-
-            assert(GAMEBOY_CPU_FREQ_HZ);
-            // wait_cycles(mcycles, GAMEBOY_CPU_FREQ_HZ);
+            // dbg->end_section_timing("cpu");
         }
 
-        auto before_ppu = std::chrono::high_resolution_clock::now();
+        // dbg->start_section_timing();
         ppu->ppu_tick(mcycles);
-        auto after_ppu = std::chrono::high_resolution_clock::now();
+        // dbg->end_section_timing("ppu");
 
-        auto ppu_duration = std::chrono::duration<double, std::milli>(after_ppu - before_ppu);
-        dbg->log_component_timing("ppu", ppu_duration.count());
-
-        auto before_mmio = std::chrono::high_resolution_clock::now();
+        // dbg->start_section_timing();
         mmio->incr_timers(mcycles);
-        auto after_mmio = std::chrono::high_resolution_clock::now();
-
-        auto mmio_duration = std::chrono::duration<double, std::milli>(after_mmio - before_mmio);
-        dbg->log_component_timing("mmio", mmio_duration.count());
+        // dbg->end_section_timing("mmio");
 
         // IE && IF != 0 wakes up CPU from halt mode
-        dbg->start_section_timing();
+        // dbg->start_section_timing();
         if (cpu->halt_mode) {
 
             if (mmio->exit_halt_mode()) {
@@ -321,15 +298,11 @@ int emulate(int argc, char* argv[]) {
                 cpu->intrpt_info.wait_cycles = 1;
             }
         }
-        dbg->end_section_timing("interrupt");
+        // dbg->end_section_timing("interrupt");
 
         // Track any remaining unaccounted time in this main loop iteration
-        dbg->start_section_timing();
-        // This captures time for:
-        // - Loop overhead
-        // - Any other operations we haven't specifically measured
-        // - Potential sleeping or waiting that's hidden somewhere
-        dbg->end_section_timing("other");
+        // dbg->start_section_timing();
+        // dbg->end_section_timing("other");
 
         // if (halt_cpu && mmio->exit_halt_mode(cpu->intrpt_info.handler_addr)) {
         //     halt_cpu = false;
@@ -360,13 +333,21 @@ int emulate(int argc, char* argv[]) {
 
 
 
+ void handle_sigterm(int) {
+    std::cerr << "Program timed out. Dumping stats...\n";
 
-
-
+    printx("Total Frame Count = %0ld\n", dbg->frame_cnt);
+    // Print profiling info, flush buffers, clean up...
+    std::exit(124); // convention: 124 = timeout exit code
+}
 
 
 
 int main(int argc, char* argv[]) {
+    // Register handler for timeout signal
+    std::signal(SIGTERM, handle_sigterm);
+    // also catch Ctrl+C for consistency
+    std::signal(SIGINT, handle_sigterm);
 
     // setup_serial_output();
     // Separate debug log file

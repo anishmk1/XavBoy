@@ -65,7 +65,7 @@ void LCD::close_window() {
     if (CPU_ONLY) return;
 
     // Print out current framebuffer contents for debug
-    print_framebuffer();
+    // print_framebuffer();
 
     // Clean up
     SDL_DestroyWindow(window);

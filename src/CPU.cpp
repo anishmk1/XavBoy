@@ -252,6 +252,8 @@
             }
         }
 
+        dbg->end_section_timing("cpu");
+        dbg->start_section_timing();
         // Interrupt handling
         set_new_interrupts();
         if (handle_interrupts()) {
@@ -262,6 +264,8 @@
                 cmd = mem->get(rf.regs[PC].val);
             // }
         }
+        dbg->end_section_timing("interrupt");
+        dbg->start_section_timing();
         
 
         // increment PC
