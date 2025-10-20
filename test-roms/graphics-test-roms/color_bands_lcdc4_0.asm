@@ -2,9 +2,9 @@
 ; ------------------------------------------------
 ; Compile with RGBASM
 ; cd ./test-roms/graphics-test-roms
-; rgbasm -o color_bands.obj color_bands.asm
-; rgblink -o color_bands.gb color_bands.obj
-; rgbfix -v -p 0 color_bands.gb
+; rgbasm -o color_bands_lcdc4_0.obj color_bands_lcdc4_0.asm
+; rgblink -o color_bands_lcdc4_0.gb color_bands_lcdc4_0.obj
+; rgbfix -v -p 0 color_bands_lcdc4_0.gb
 ; ------------------------------------------------
 ; ------------------------------------------------
 ;   color_bands.asm ---
@@ -41,27 +41,27 @@ Start:
     ; First Define 4 tiles - all white to all black 8x8 grid of pixels
     ; each tile takes 16 bytes
 
-    ; TILE 0 ($8000) -- ALL WHITE
+    ; TILE 0 ($9000) -- ALL WHITE
     ld hl, Tile0White   ; HL = source in ROM
-    ld de, $8000        ; DE = destination in VRAM
+    ld de, $9000        ; DE = destination in VRAM
     ld b, 16            ; B = number of bytes to copy
     call CopyToVRAM
 
-    ; TILE 1 ($8010) -- ALL LIGHT GREY
+    ; TILE 1 ($9010) -- ALL LIGHT GREY
     ld hl, Tile1LightGrey   ; HL = source in ROM
-    ld de, $8010            ; DE = destination in VRAM
+    ld de, $9010            ; DE = destination in VRAM
     ld b, 16                ; B = number of bytes to copy
     call CopyToVRAM
 
-    ; TILE 2 ($8020) -- ALL DARK GREY
+    ; TILE 2 ($9020) -- ALL DARK GREY
     ld hl, Tile2DarkGrey    ; HL = source in ROM
-    ld de, $8020            ; DE = destination in VRAM
+    ld de, $9020            ; DE = destination in VRAM
     ld b, 16                ; B = number of bytes to copy
     call CopyToVRAM
 
-    ; TILE 3 ($8030) -- ALL BLACK
+    ; TILE 3 ($0030) -- ALL BLACK
     ld hl, Tile3Black       ; HL = source in ROM
-    ld de, $8030            ; DE = destination in VRAM
+    ld de, $9030            ; DE = destination in VRAM
     ld b, 16                ; B = number of bytes to copy
     call CopyToVRAM
 
@@ -120,7 +120,7 @@ ColLoop:
 
 ExitLoop:
     ; Enable LCD
-    ld a, %10010001     ; LCD on; BG Tile Data Mode = unsigned; BG on
+    ld a, %10000001     ; LCD on; BG Tile Data Mode = signed; BG on
     ldh [$ff40], a      ; rLCDC <= a (upper byte is FF implicit in ldh)
     
 

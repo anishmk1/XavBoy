@@ -52,6 +52,7 @@ public:
     void ppu_tick(int mcycles);
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
+    void oam_scan();
     void fetch_pixel(int pixel_x);
     void render_pixel();
 

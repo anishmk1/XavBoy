@@ -59,17 +59,6 @@ bool FIFO::pop(Pixel& pxl) {
     pixels[FIFO_DEPTH - 1] = Pixel{};
     size--;
 
-
-
-    // debug_file << "Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << std::endl;
-    // debug_file  << "     Inside pop() for pxl.color=" << static_cast<int>(pxl.color) << "; pxl.valid =" 
-    //             << pxl.valid << "; framebuffer x,y = {" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
-    // if (pxl.valid == false) {
-    //     debug_file << "[PPU FIFO POP] POPPED PXL INVALID; size = " << size << std::endl;
-    //     std::exit(EXIT_FAILURE);
-    // } else {
-    //     debug_file << "[PPU FIFO POP] popped pxl is valid" << std::endl;
-    // }
     assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
 
     return true;
@@ -140,6 +129,10 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
  * 
  */
 
+void PPU::oam_scan() {
+    
+}
+
 
 
 void PPU::render_pixel() {
@@ -165,10 +158,14 @@ void PPU::fetch_pixel(int pixel_x) {
 
     // Static => Only re-fetch tile_data when pixel_x hits a new tile
     static std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
-    static uint8_t scy, scx;
+    static uint8_t scy, scx, lcdc;
+    static std::array<uint8_t, 16> win_tile_data;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     uint8_t ly = mem->get(REG_LY);
     uint8_t color_palette = mem->get(REG_BGP);
+
+    uint16_t tile_data_base_addr;
+    bool lcdc_4;
 
     // New tile - re-fetch tile data
     if (pixel_x % 8 == 0) {
@@ -188,13 +185,30 @@ void PPU::fetch_pixel(int pixel_x) {
         int scroll_adj_tile_ofst_y = (scy + ly) / 8;
         uint16_t tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
 
-        uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
+        // uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
+        // int tile_id = mem->get(tile_id_addr);   // 8 bit number zexts to int
+
+        int tile_id;
+        lcdc = mem->get(REG_LCDC);
+        lcdc_4 = ((lcdc >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
+        if (lcdc_4 == 1) {
+            // The “$8000 method” (Default): with unsigned addressing
+            tile_data_base_addr = 0x8000;
+            tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
+             
+        } else {
+            // The “$8800 method”: with signed addressing
+            tile_data_base_addr = 0x9000;
+            tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
+        }
+
 
         // Then fetch what that tile looks like from Memory.
         // Get the 16 byte data (each pixel is 2 bits. 8x8 = 64 pixels => 128 bits => 128/8 = 16 bytes)
         // FIXME: figure out the correct Tile Data base addr based on register configuration
         // uint16_t tile_data_addr = 0x9000 + (tile_id * 16);       // 0x9000 = base addr for VRAM Tile Data for (BG/WIN when LCDC.4 is 0 and Using unsigned tile addressign mode)
-        uint16_t tile_data_addr = 0x8000 + (tile_id * 16);
+        // uint16_t tile_data_addr = 0x8000 + (tile_id * 16);
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
         for (int i = 0; i < 16; i++) {
             // Populating each byte of tile data
             tile_data[i] = mem->get(tile_data_addr + i);
@@ -202,9 +216,10 @@ void PPU::fetch_pixel(int pixel_x) {
 
         DBG( std::endl);
         DBG( std::endl);
-        DBG( "      New tile - fetching info below" << std::endl);
+        // DBG( "      New tile - fetching info below" << std::endl);
+        DBG( "      tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tild_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
         // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
-        DBG( "      tile_id = " << static_cast<int>(tile_id) << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
+        DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
         std::string debug_str = "";
         for (int i = 0; i < 16; i++) {
@@ -285,7 +300,7 @@ void PPU::ppu_tick(int mcycles){
                     this->mode = PPUMode::DRAW_PIXELS;
                     // Loop through OAM memory and populate first 10 objects
                     // that are visible on this scanline (Y coord)
-                    // oam_scan();
+                    oam_scan();
                 }
                 break;
             }

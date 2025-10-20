@@ -38,7 +38,7 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
 
     framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
     if (dbg->frame_cnt == 1) {
-        dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
+        // dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
     }
 
     // Manage frame buffer pointers
@@ -74,15 +74,15 @@ void LCD::close_window() {
     // std::exit(EXIT_SUCCESS);
 }
 
-void LCD::print_framebuffer() {
+// void LCD::print_framebuffer() {
 
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
-        for (int x = 0; x < SCREEN_WIDTH; x++) {
-            pixel_map << static_cast<int>(dbg->last_framebuffer[y][x]) << " ";
-        }
-        pixel_map << std::endl;
-    }
-}
+//     for (int y = 0; y < SCREEN_HEIGHT; y++) {
+//         for (int x = 0; x < SCREEN_WIDTH; x++) {
+//             pixel_map << static_cast<int>(dbg->last_framebuffer[y][x]) << " ";
+//         }
+//         pixel_map << std::endl;
+//     }
+// }
 
 void LCD::draw_frame() {
     if (CPU_ONLY) return;

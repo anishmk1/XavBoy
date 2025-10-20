@@ -23,7 +23,7 @@ const uint16_t REG_SCX  = 0xff43;   // Background viewport X position
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 // constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 1 << 6;   // Bit 6
 // constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 1 << 5;   // Bit 5
-// constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 1 << 4;   // Bit 4
+constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 4;   // Bit 4
 // constexpr uint8_t LCDC_BG_TILEMAP_BIT        = 1 << 3;   // Bit 3
 // constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 1 << 2;   // Bit 2
 // constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1 << 1;   // Bit 1
@@ -47,6 +47,7 @@ extern Memory *mem;      // Globally referencable Memory
 extern MMIO *mmio;
 extern Debug *dbg;      // Reference to Debug module should be visible from everywhere
 extern LCD *lcd;
+extern CPU *cpu;
 
 #define printx(...)                            \
     do {                                       \
@@ -60,20 +61,16 @@ extern LCD *lcd;
             printf(__VA_ARGS__);                    \
     } while (0)
 
-/**
-// #define print(...)                             \
-//     do {                                       \
-//         if (disable_prints == 0)               \
-//             printf(__VA_ARGS__);               \
-//     } while (0)
- */
+#define print(...)                             \
+    do {                                       \
+        if (disable_prints == 0)               \
+            printf(__VA_ARGS__);               \
+    } while (0)
 
 
 #ifdef DEBUG_MODE
-    #define print(...) printf(__VA_ARGS__)
     #define DBG(x) do { debug_file << x; } while(0)
 #else
-    #define print(...) do {} while(0)
     #define DBG(x) do {} while(0)
 #endif
 

@@ -55,7 +55,7 @@ typedef struct {
 
 class Debug {
 public:
-    Color last_framebuffer[144][160];
+    // Color last_framebuffer[144][160];
 
     unsigned long instr_cnt = 0;
     unsigned long mcycle_cnt = 0;

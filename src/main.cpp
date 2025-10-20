@@ -31,6 +31,7 @@ Memory *mem;
 PPU *ppu;
 MMIO *mmio;
 LCD *lcd;
+CPU *cpu;
 std::ofstream logFile;
 std::ofstream debug_file;
 std::ofstream pixel_map;
@@ -43,7 +44,7 @@ const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from ad
 const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
-const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
+// const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
 
 
 // FIXME:: Just use a simple ifstream/fread() into a. I decided on mmap before realizing I needed to load the
@@ -85,28 +86,6 @@ void setup_serial_output() {
     std::clog << "Serial Output Window....\n\n";
 }
 
-
-// Wait for some real world duration equivalent to the specified number 
-// of machine cycles at the given clock frequency (Hz)
-void wait_cycles(int mcycles, double clock_frequency_hz) {
-    // Each machine cycle = 4 clock cycles
-    const int clocks_per_mcycle = 4;
-
-    // Total clock cycles
-    double total_clocks = mcycles * clocks_per_mcycle;
-
-    // Duration of one clock cycle (in seconds)
-    double seconds_per_cycle = 1.0 / clock_frequency_hz;
-
-    // Total duration to wait (in seconds)
-    double wait_time_seconds = total_clocks * seconds_per_cycle;
-
-    // Convert to chrono duration
-    auto wait_duration = std::chrono::duration<double>(wait_time_seconds);
-
-    std::this_thread::sleep_for(wait_duration);
-}
-
 // Poll for events
 // SDL_PollEvent checks the queue of events. Since multiple events can be queued up per frame
 // Loop exits once all events are popped off the q
@@ -119,14 +98,16 @@ bool sdl_event_loop(bool& main_loop_running) {
         if (event.type == SDL_QUIT) {
             main_loop_running = false; // Window closed
 
-            DBG("CLOSING SDL WINDOW" << std::endl);
-            lcd->close_window();
-
-            // std::exit(EXIT_SUCCESS);
-            return true;
         }
     }
 
+    if (main_loop_running == false) {
+        DBG("CLOSING SDL WINDOW" << std::endl);
+        lcd->close_window();
+        // goto exit_main;
+        std::exit(EXIT_SUCCESS);
+        // return true;
+    }
     return false;
 }
 
@@ -134,9 +115,7 @@ bool sdl_event_loop(bool& main_loop_running) {
 //            Emulate the Gameboy           //
 //------------------------------------------//
 int emulate(int argc, char* argv[]) {
-    setup_serial_output();
-
-    CPU *cpu    = new CPU(mem);
+    // setup_serial_output();
 
     //  1 - PASSED
     //  2 - PASSED
@@ -178,8 +157,9 @@ int emulate(int argc, char* argv[]) {
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
     // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
+    rom_path = "test-roms/graphics-test-roms/color_bands_lcdc4_0.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
-    rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -189,7 +169,7 @@ int emulate(int argc, char* argv[]) {
     //      wlalink -S -v ../gb-test-roms/cpu_instrs/source/linkfile cpu_instrs_2_debug.gb
     
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--debug") == 0) {
+        if (strcmp(argv[i], "--step") == 0) {
             DEBUGGER = true;
         } else if (strcmp(argv[i], "--quiet") == 0) {
             PRINT_REGS_EN = false;
@@ -242,7 +222,7 @@ int emulate(int argc, char* argv[]) {
         if (lcd->frame_ready) {
             // Poll SDL events once per frame for better WSL2 performance
             // dbg->start_section_timing();
-            if (sdl_event_loop(main_loop_running)) {
+            if (sdl_event_loop(main_loop_running) == true) {
                 return 0;
             }
             // dbg->end_section_timing("sdl_events");
@@ -303,34 +283,10 @@ int emulate(int argc, char* argv[]) {
         // Track any remaining unaccounted time in this main loop iteration
         // dbg->start_section_timing();
         // dbg->end_section_timing("other");
-
-        // if (halt_cpu && mmio->exit_halt_mode(cpu->intrpt_info.handler_addr)) {
-        //     halt_cpu = false;
-        //     cpu->intrpt_info.interrupt_valid = true;
-        //     cpu->intrpt_info.wait_cycles = 0;
-        // }
-
     }
 
     return 0;
 }
-
-/**
- * PERFORMACE INVESTIGATION:
- *      Need more performance metrics
- *      For each frame,
- *          how many main loops are executed?
- *          For each main loop,
- *              how much time was spent in the CPU execute logic
- *              How much time was spent in ppu_step function?
- *          How much time was spent in lcd draw frame?
- * 
- *      Aggregate metrics:
- *      At the end of sim, 
- *      how much total % time spent in CPU? PPU? LCD?
- *      
- */
-
 
 
  void handle_sigterm(int) {
@@ -360,7 +316,7 @@ int main(int argc, char* argv[]) {
     // use valgrind etc
     mem         = new Memory();     // FIXME: Change "mem" reference to "mmu". Then memory field can be renamed back to "mem"
     mmio        = new MMIO();
-    // CPU *cpu    = new CPU(mem);
+    cpu         = new CPU();
     ppu         = new PPU();
     dbg         = new Debug();
     lcd         = new LCD();
@@ -372,6 +328,7 @@ int main(int argc, char* argv[]) {
     delete lcd;
     delete dbg;
     delete ppu;
+    delete cpu;
     delete mmio;
     delete mem;
     pthread_exit(NULL);

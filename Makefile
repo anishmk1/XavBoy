@@ -19,7 +19,7 @@ CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
 CXXRELFLAGS = -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
 # CXXDBGFLAGS = -g -O2 -Wall -Wextra -std=c++17 -fsanitize=address,undefined $(SDL_CFLAGS)
 # LDDBGFLAGS = -g -O2 -fsanitize=address,undefined -rdynamic
-CXXDBGFLAGS = -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline $(SDL_CFLAGS)
+CXXDBGFLAGS = -DDEBUG_MODE -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline $(SDL_CFLAGS)
 LDDBGFLAGS = -g -O0 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline -rdynamic
 
 all: clean compile link
@@ -29,12 +29,14 @@ build: clean compile link
 
 build_release: clean compile_release link
 
-# release: clean compile_release link
 release: build_release
 	@./myprogram --quiet
 
-debug: clean compile link
-	@./myprogram --debug
+step: clean compile link
+	@./myprogram --step
+
+debug: clean gdb
+	./myprogram --quiet
 
 quiet: clean compile link
 	@./myprogram --quiet

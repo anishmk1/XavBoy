@@ -47,7 +47,6 @@ class Memory;
 class RegFile {
 public:
     Reg regs[NUM_REGS];
-    Memory *mem;
 
     uint16_t get(r16_index_t r16);
     uint8_t get(r8_index_t r8);
@@ -67,7 +66,6 @@ public:
 class CPU {
 
 public:
-    Memory *mem;
     RegFile rf;
 
     InterruptInfo intrpt_info;      // FIXME: This should be in private
@@ -75,7 +73,7 @@ public:
     bool halt_mode = 0;
     bool stop_mode = 0;
 
-    CPU (Memory *mem);
+    CPU ();
     int execute();
 
 private:

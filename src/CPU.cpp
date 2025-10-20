@@ -190,20 +190,10 @@
                         regs[AF].val, regs[BC].val, regs[DE].val, regs[HL].val, regs[SP].val, regs[PC].val, regs[AF].flags.z,  regs[AF].flags.n,  regs[AF].flags.h,  regs[AF].flags.c, mem->get(get(HL)));
         }
     }
-// };
-
-
-// class CPU {
-// public:
-
-//     Memory *mem;
-//     RegFile rf;
 
 
 
-    CPU::CPU (Memory *mem) {
-        rf.mem = mem;
-        this->mem = mem;
+    CPU::CPU () {
 
         this->intrpt_info.interrupt_valid = false;
 
@@ -234,10 +224,11 @@
         bool nop = false;
         uint8_t cmd;
         int mcycles = 1;
+        static bool inf_loop = false;
 
         // FIRST Get next cmd and print results of prev instruction before further processing of "NEW" state
         cmd = mem->get(rf.regs[PC].val);
-        if (GAMEBOY_DOCTOR) {
+        if (GAMEBOY_DOCTOR && !inf_loop) {
             rf.print_regs();
         }
 
@@ -245,10 +236,13 @@
         // check for infinite loop
         // NOTE: Remember to disable this when you want to test graphics - LCD will be ON and inifinite loop will
         //       allow PPU to operate freely.
-        if (CPU_ONLY) {
-            if ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE)) {
+        if (!inf_loop && ((cmd == 0x18) && (mem->get(rf.get(PC) + 1) == 0xFE))) {
+            inf_loop = true;
+            if (CPU_ONLY) {
                 print ("Detected Infinite loop. Exiting sim\n");
                 std::exit(EXIT_SUCCESS);
+            } else {
+                printx ("Detected Infinite loop. Disabling Reg data dumps\n");
             }
         }
 
@@ -907,7 +901,7 @@
         rf.regs[AF].lo &= 0b11110000;
 
 
-        if (!nop && !GAMEBOY_DOCTOR) rf.print_regs();
+        if (!nop && !GAMEBOY_DOCTOR && !inf_loop) rf.print_regs();
 
         serial_output();
 
@@ -1049,7 +1043,6 @@
     // bool CPU::check_and_handle_interrupts() {
     bool CPU::set_new_interrupts() {
 
-        print ("Inside set_new_interrupts; clk num %0ld\n", dbg->instr_cnt);
         if (mmio->check_interrupts(intrpt_info.handler_addr, 0)) {
             // 1. Two wait states are executed (2 M-cycles pass 
             //     while nothing happens; 
@@ -1058,7 +1051,6 @@
             // MISSING ^^
             // cpu_nops = 2;
 
-            print ("check_interrupts returned TRUE; clk num %0ld\n", dbg->instr_cnt);
             intrpt_info.interrupt_valid = true;
             intrpt_info.wait_cycles = 0;
             return true;
@@ -1080,4 +1072,3 @@
             mem->set(0xff02, 1);
         }    
     }
-// };

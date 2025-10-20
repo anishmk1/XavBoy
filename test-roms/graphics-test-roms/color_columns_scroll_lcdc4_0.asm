@@ -2,13 +2,13 @@
 ; ------------------------------------------------
 ; Compile with RGBASM
 ; cd ./test-roms/graphics-test-roms
-; rgbasm -o color_bands.obj color_bands.asm
-; rgblink -o color_bands.gb color_bands.obj
-; rgbfix -v -p 0 color_bands.gb
+; rgbasm -o color_columns_scroll.obj color_columns_scroll.asm
+; rgblink -o color_columns_scroll.gb color_columns_scroll.obj
+; rgbfix -v -p 0 color_columns_scroll.gb
 ; ------------------------------------------------
 ; ------------------------------------------------
-;   color_bands.asm ---
-;     Splits the screen into 4 horizontal bands:
+;   color_columns_scroll.asm ---
+;     Splits the screen into 4 vertical bands:
 ;     White, Light Grey, Dark Grey, and Black
 ; ------------------------------------------------
 ; ------------------------------------------------
@@ -32,7 +32,7 @@ Start:
     ;-------------------------------;
     ;    Write Tile Data to VRAM    ;
     ;-------------------------------;
-    
+
     ; Initialize palette (all 4 shades)
     ld a, %11100100   ; 00=white, 01=light gray, 10=dark gray, 11=black
     ldh [$ff47], a       ; rBGP <= a
@@ -70,62 +70,81 @@ Start:
 ;    Write Tile Map Indexes     ;
 ;-------------------------------;
 ; --- setup constants ---
-    ld b, 0             ; b = tile row = 0
+    ld b, 0             ; b = pixel row = 0
     ld hl, $9800        ; Init HL to start of BG Tile Map
-RowLoop:
+ RowLoop:
     ld a, b
-    sla a               ; [NEW] multiply tile row by 8 -> convert to pixel y
-    sla a               ; [NEW]
-    sla a               ; [NEW]
-    ; now A = pixel_y (0, 8, 16, ...)
-
-    cp 144              ; if row == 144, then ExitLoop
+    cp 144              ; if row == 144 (full screen height), then ExitLoop
     jr z, ExitLoop
-    
 
-    ; --- decide tile index based on row ---
-    cp 36               ; check row < 36?
-    jr c, RowTile0
-    cp 72               ; check row < 72 ?
-    jr c, RowTile1
-    cp 108              ; check row < 108?
-    jr c, RowTile2
-    jr RowTile3 ; else (row >= 108)
-
-
-RowTile0:
-    ld a, 0             ; Tile0 is @ 0x8000 - so write index = 0 
-    jr RowTileChosen
-RowTile1:
-    ld a, 1             ; Tile1 is @ 0x8010 - so write index = 1
-    jr RowTileChosen
-RowTile2:
-    ld a, 2             ; Tile2 is @ 0x8020 - so write index = 2
-    jr RowTileChosen
-RowTile3:
-    ld a, 3             ; Tile3 is @ 0x8030 - so write index = 3
-
-; a contains the tile index value for this row (selected above)
-RowTileChosen:
-    ld c, 32            ; column counter (32 tiles per row)
+    ld c, 0             ; column counter (32 tiles per row)
 
 ColLoop:
+    ; --- decide tile index based on column ---
+    ld a, c
+    cp 8                ; check col < 8?
+    jr c, ColTile0
+    cp 16               ; check col < 16 ?
+    jr c, ColTile1
+    cp 24               ; check col < 24?
+    jr c, ColTile2
+    jr ColTile3         ; else (col >= 24)
+
+ColTile0:
+    ld a, 0             ; Tile0 is @ 0x8000 - so write index = 0
+    jr ColTileChosen
+ColTile1:
+    ld a, 1             ; Tile1 is @ 0x8010 - so write index = 1
+    jr ColTileChosen
+ColTile2:
+    ld a, 2             ; Tile2 is @ 0x8020 - so write index = 2
+    jr ColTileChosen
+ColTile3:
+    ld a, 3             ; Tile3 is @ 0x8030 - so write index = 3
+
+; a contains the tile index value for this column (selected above)
+ColTileChosen:
     ld [hl+], a         ; write tile index and advance HL
-    dec c
+    inc c
+    ld a, c
+    cp 32               ; check if we've done all 32 columns
     jr nz, ColLoop
 
-    inc b               ; move to next tile row
-    cp 32               ; [NEW] stop after 32 tile rows
-    jr nz, RowLoop      ; [CHANGED condition]
+    inc b               ; move to next row
+    jr RowLoop
 
 ExitLoop:
     ; Enable LCD
     ld a, %10010001     ; LCD on; BG Tile Data Mode = unsigned; BG on
     ldh [$ff40], a      ; rLCDC <= a (upper byte is FF implicit in ldh)
-    
+
+
+    ;;;;;;;; BREAKPOINT 2 ;;;;;;;;;;;;;
+    ld hl, $FFFE   ; HL = target address
+    ld e, $AC
+    ld [hl], e      ; keep an eye on the value of b (ROW). Make sure it goes to 32
+    ld [hl], 0
+    ;;;;;;;; BREAKPOINT 2 ;;;;;;;;;;;;;
+
 
 Forever:
+    ; Wait for VBlank before updating SCX
+    call WaitVBlank
+
+    ; Now safe to update scroll register
+    ld a, [$ff43]       ; Load SCX (horizontal scroll)
+    inc a
+    ld [$ff43], a       ; Store back to SCX
     jr Forever
+
+; Subroutine to wait for VBlank period
+WaitVBlank:
+    ld a, [$ff44]       ; Read LY register (current scanline)
+    cp 144              ; VBlank starts at scanline 144
+    jr c, WaitVBlank    ; If LY < 144, keep waiting
+    ret                 ; VBlank detected, safe to return
+
+
 
 
 ; Subroutine to Copy Predefined tile data into VRAM
@@ -146,7 +165,7 @@ SECTION "TileData", ROM0
 Tile0White:
     ds 16, 0   ; 16 bytes of 0x00 → all pixels index 0 (white)
 
-; Encode Tile data such that all pixels are 01 
+; Encode Tile data such that all pixels are 01
 ; Bytes 0/2/4/6/8/10/12/14 should be FF
 ; Bytes 1/3/5/7/9/11/13/15 should be 00
 Tile1LightGrey:

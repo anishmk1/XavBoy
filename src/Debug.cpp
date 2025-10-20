@@ -76,7 +76,7 @@ void Debug::debugger_break(CPU &cpu) {
     }
     // If requested instruction is found, break execution (priority = 2)
     if (tgt_instr != 0xd3) {
-        if (cpu.mem->get(cpu.rf.get(PC)) == tgt_instr) {
+        if (mem->get(cpu.rf.get(PC)) == tgt_instr) {
             break_execution = true;
             tgt_instr = 0xd3;
         } else {
@@ -147,13 +147,13 @@ void Debug::debugger_break(CPU &cpu) {
             } else if (dbg_cmd[0] == 'm') {
                 if (dbg_cmd.size() == 5) {
                     int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);
-                    uint16_t val = cpu.mem->get(addr);
+                    uint16_t val = mem->get(addr);
                     printx ("mem[0x%0x] = 0x%0x\n", addr, val);
                 } else if (dbg_cmd[1] == 'd' && dbg_cmd.size() == 6) {
                     // Memory Dump
                     int addr = std::stoi(dbg_cmd.substr(2), nullptr, 16);
                     for (int i = (addr-20); i < (addr+20); i++) {
-                        printx ("mem[0x%0x]=0x%0x, ", i, cpu.mem->get(i));
+                        printx ("mem[0x%0x]=0x%0x, ", i, mem->get(i));
                         if ((i - (addr-20)) % 10 == 9) {
                             printx ("\n");
                         }
@@ -191,11 +191,7 @@ void Debug::debugger_break(CPU &cpu) {
 void Debug::init_csv_logging() {
     if (!perf.csv_logging_enabled) return;
 
-    static bool csv_initialized = false;
-    if (!csv_initialized) {
-        write_csv_header();
-        csv_initialized = true;
-    }
+    write_csv_header();
 }
 
 void Debug::start_frame_timing() {
