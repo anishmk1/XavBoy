@@ -263,11 +263,13 @@ void PPU::ppu_tick(int mcycles){
     static int dot_cnt    = 0;     // initialized once, persists across calls
 
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #ifndef REL_MODE
     if (dbg->mcycle_cnt >= 20000000) {
         print ("Run for enough time. Exit\n");
         DBG("Run for enough time. Exit" << std::endl);
         std::exit(EXIT_SUCCESS);
     }
+    #endif
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     

@@ -197,21 +197,25 @@
 
         this->intrpt_info.interrupt_valid = false;
 
-        if (SKIP_BOOT_ROM) {
-            // Load initial system state after BOOT_ROM 
-            rf.set(A, 0x01);
-            rf.set(F, 0xB0);     // FIXME: In gameboy doctor docs: F	0xB0 (or CH-Z if managing flags individually)
-            rf.set(B, 0x00);
-            rf.set(C, 0x13);
-            rf.set(D, 0x00);
-            rf.set(E, 0xD8);
-            rf.set(H, 0x01);
-            rf.set(L, 0x4D);
-            rf.set(SP, 0xFFFE);
-            rf.set(PC, 0x100);
-        } else {
-            rf.regs[PC].val = 0;
-        }
+        // Start from boot ROM at address 0x0000
+        rf.set(PC, 0x0000);
+
+        // POST-BOOT ROM VALUES - Commented out because boot ROM will set these
+        // if (SKIP_BOOT_ROM) {
+        //     // Load initial system state after BOOT_ROM
+        //     rf.set(A, 0x01);
+        //     rf.set(F, 0xB0);     // FIXME: In gameboy doctor docs: F	0xB0 (or CH-Z if managing flags individually)
+        //     rf.set(B, 0x00);
+        //     rf.set(C, 0x13);
+        //     rf.set(D, 0x00);
+        //     rf.set(E, 0xD8);
+        //     rf.set(H, 0x01);
+        //     rf.set(L, 0x4D);
+        //     rf.set(SP, 0xFFFE);
+        //     rf.set(PC, 0x100);
+        // } else {
+        //     rf.regs[PC].val = 0;
+        // }
     }
 
     // add a destructor

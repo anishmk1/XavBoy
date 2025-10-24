@@ -16,7 +16,7 @@ endif
 
 # CXX = g++
 CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
-CXXRELFLAGS = -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
+CXXRELFLAGS = -DREL_MODE -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
 # CXXDBGFLAGS = -g -O2 -Wall -Wextra -std=c++17 -fsanitize=address,undefined $(SDL_CFLAGS)
 # LDDBGFLAGS = -g -O2 -fsanitize=address,undefined -rdynamic
 CXXDBGFLAGS = -DDEBUG_MODE -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline $(SDL_CFLAGS)

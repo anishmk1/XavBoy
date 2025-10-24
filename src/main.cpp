@@ -41,7 +41,7 @@ bool DEBUGGER = false;
 bool PRINT_REGS_EN = true;
 bool CPU_ONLY = false;
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
-const bool SKIP_BOOT_ROM = true;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
+const bool SKIP_BOOT_ROM = false;   // default: false; Boot ROM execution is now enabled by default
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
 // const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
@@ -162,6 +162,10 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
+    // ---------------------------------------- GAMES ------------------------------------------------
+    // rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
+
+
     // Note: To produce Debug roms (With .sym dbeugger symbols)
     //      cd XavBoy/test-roms/gb-test-roms/cpu_instrs/source
     //      wla-gb -D DEBUG -o ../../../blarggs-debug-roms/test.o 02-interrupts.s
@@ -185,6 +189,11 @@ int emulate(int argc, char* argv[]) {
         std::cerr << "Error opening the file!" << std::endl;
         return 1;
     }
+
+    // Load boot ROM first
+    mem->load_boot_rom();
+
+    // Then load game ROM
     mem->load_rom(rom_ptr, file_size);
 
     if (munmap(rom_ptr, file_size) == -1) {
@@ -325,6 +334,7 @@ int main(int argc, char* argv[]) {
      
     emulate(argc, argv);
 
+    lcd->close_window();
     delete lcd;
     delete dbg;
     delete ppu;

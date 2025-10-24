@@ -32,63 +32,66 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
     Memory::Memory () {
         // init all mem locations to 0
         memory = std::vector<uint8_t>(MEMORY_SIZE, 0);
+        boot_rom = std::vector<uint8_t>(256, 0);
+        boot_rom_enabled = true;
 
+        // POST-BOOT ROM VALUES - Commented out because boot ROM will set these
         // Load Boot ROM -- Note these values change based on GameBoy version.
-        memory[0xFF00] = 0xCF; // P1	
-        memory[0xFF01] = 0x00; // SB	
-        memory[0xFF02] = 0x7E; // SC	
-        memory[0xFF04] = 0x18; // DIV
-        memory[0xFF05] = 0x00; // TIMA
-        memory[0xFF06] = 0x00; // TMA
-        memory[0xFF07] = 0xF8; // TAC
-        memory[0xFF0F] = 0xE1; // IF
-        memory[0xFF10] = 0x80; // NR10
-        memory[0xFF11] = 0xBF; // NR11
-        memory[0xFF12] = 0xF3; // NR12
-        memory[0xFF13] = 0xFF; // NR13
-        memory[0xFF14] = 0xBF; // NR14
-        memory[0xFF16] = 0x3F; // NR21
-        memory[0xFF17] = 0x00; // NR22
-        memory[0xFF18] = 0xFF; // NR23
-        memory[0xFF19] = 0xBF; // NR24
-        memory[0xFF1A] = 0x7F; // NR30
-        memory[0xFF1B] = 0xFF; // NR31
-        memory[0xFF1C] = 0x9F; // NR32
-        memory[0xFF1D] = 0xFF; // NR33
-        memory[0xFF1E] = 0xBF; // NR34
-        memory[0xFF20] = 0xFF; // NR41
-        memory[0xFF21] = 0x00; // NR42
-        memory[0xFF22] = 0x00; // NR43
-        memory[0xFF23] = 0xBF; // NR44
-        memory[0xFF24] = 0x77; // NR50
-        memory[0xFF25] = 0xF3; // NR51
-        memory[0xFF26] = 0xF1; // NR52
-        memory[0xFF40] = 0x91; // LCDC
-        memory[0xFF41] = 0x81; // STAT
-        memory[0xFF42] = 0x00; // SCY
-        memory[0xFF43] = 0x00; // SCX
-        memory[0xFF44] = 0x91; // LY
-        memory[0xFF45] = 0x00; // LYC
-        memory[0xFF46] = 0xFF; // DMA
-        memory[0xFF47] = 0xFC; // BGP
-        memory[0xFF48] = 0x00; // OBP0
-        memory[0xFF49] = 0x00; // OBP1
-        memory[0xFF4A] = 0x00; // WY
-        memory[0xFF4B] = 0x00; // WX
-        memory[0xFF4D] = 0x7E; // KEY1
-        memory[0xFF4F] = 0xFE; // VBK
-        memory[0xFF51] = 0xFF; // HDMA1
-        memory[0xFF52] = 0xFF; // HDMA2
-        memory[0xFF53] = 0xFF; // HDMA3
-        memory[0xFF54] = 0xFF; // HDMA4
-        memory[0xFF55] = 0xFF; // HDMA5
-        memory[0xFF56] = 0x3E; // RP
-        memory[0xFF68] = 0x00; // BCPS
-        memory[0xFF69] = 0x00; // BCPD
-        memory[0xFF6A] = 0x00; // OCPS
-        memory[0xFF6B] = 0x00; // OCPD
-        memory[0xFF70] = 0xF8; // SVBK
-        memory[0xFFFF] = 0x00; // IE
+        // memory[0xFF00] = 0xCF; // P1
+        // memory[0xFF01] = 0x00; // SB
+        // memory[0xFF02] = 0x7E; // SC
+        // memory[0xFF04] = 0x18; // DIV
+        // memory[0xFF05] = 0x00; // TIMA
+        // memory[0xFF06] = 0x00; // TMA
+        // memory[0xFF07] = 0xF8; // TAC
+        // memory[0xFF0F] = 0xE1; // IF
+        // memory[0xFF10] = 0x80; // NR10
+        // memory[0xFF11] = 0xBF; // NR11
+        // memory[0xFF12] = 0xF3; // NR12
+        // memory[0xFF13] = 0xFF; // NR13
+        // memory[0xFF14] = 0xBF; // NR14
+        // memory[0xFF16] = 0x3F; // NR21
+        // memory[0xFF17] = 0x00; // NR22
+        // memory[0xFF18] = 0xFF; // NR23
+        // memory[0xFF19] = 0xBF; // NR24
+        // memory[0xFF1A] = 0x7F; // NR30
+        // memory[0xFF1B] = 0xFF; // NR31
+        // memory[0xFF1C] = 0x9F; // NR32
+        // memory[0xFF1D] = 0xFF; // NR33
+        // memory[0xFF1E] = 0xBF; // NR34
+        // memory[0xFF20] = 0xFF; // NR41
+        // memory[0xFF21] = 0x00; // NR42
+        // memory[0xFF22] = 0x00; // NR43
+        // memory[0xFF23] = 0xBF; // NR44
+        // memory[0xFF24] = 0x77; // NR50
+        // memory[0xFF25] = 0xF3; // NR51
+        // memory[0xFF26] = 0xF1; // NR52
+        // memory[0xFF40] = 0x91; // LCDC
+        // memory[0xFF41] = 0x81; // STAT
+        // memory[0xFF42] = 0x00; // SCY
+        // memory[0xFF43] = 0x00; // SCX
+        // memory[0xFF44] = 0x91; // LY
+        // memory[0xFF45] = 0x00; // LYC
+        // memory[0xFF46] = 0xFF; // DMA
+        // memory[0xFF47] = 0xFC; // BGP
+        // memory[0xFF48] = 0x00; // OBP0
+        // memory[0xFF49] = 0x00; // OBP1
+        // memory[0xFF4A] = 0x00; // WY
+        // memory[0xFF4B] = 0x00; // WX
+        // memory[0xFF4D] = 0x7E; // KEY1
+        // memory[0xFF4F] = 0xFE; // VBK
+        // memory[0xFF51] = 0xFF; // HDMA1
+        // memory[0xFF52] = 0xFF; // HDMA2
+        // memory[0xFF53] = 0xFF; // HDMA3
+        // memory[0xFF54] = 0xFF; // HDMA4
+        // memory[0xFF55] = 0xFF; // HDMA5
+        // memory[0xFF56] = 0x3E; // RP
+        // memory[0xFF68] = 0x00; // BCPS
+        // memory[0xFF69] = 0x00; // BCPD
+        // memory[0xFF6A] = 0x00; // OCPS
+        // memory[0xFF6B] = 0x00; // OCPD
+        // memory[0xFF70] = 0xF8; // SVBK
+        // memory[0xFFFF] = 0x00; // IE
     }
 
     // FIXME:: when LCD is ON and PPU is actively drawing (aka not HBLANK or VBLANK) cpu should not be able to access VRAM or OAM. And vice versa (i think)
@@ -96,6 +99,17 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
         if (addr < 0) {
             std::cerr << "Memory access with out of bounds address: " << addr << std::endl;
             return 1;
+        } else if (addr <= 0x00FF) {          // Boot ROM region (0x0000-0x00FF)
+            if (read_nwr) {
+                // If boot ROM is enabled, read from boot ROM, otherwise read from cartridge ROM
+                if (boot_rom_enabled) {
+                    return boot_rom[addr];
+                } else {
+                    return memory[addr];
+                }
+            } else {
+                return 1;  // Cannot write to ROM
+            }
         } else if (addr <= 0x3FFF) {          // 16 KiB ROM bank 00
             if (read_nwr) return memory[addr];
             else return 1;  // printx ("Attempted write-access to ROM addr: 0x%0x\n", addr);
@@ -145,6 +159,17 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
                 return 0;
             }
         } else if (addr <= 0xFF7F) {          // I/O Registers
+            // Handle boot ROM disable register (0xFF50)
+            if (addr == 0xFF50) {
+                if (!read_nwr) {  // Write
+                    boot_rom_enabled = false;
+                    print("Boot ROM unmapped at PC=0x%04X\n", mem->get(0xFFFC) | (mem->get(0xFFFD) << 8));
+                    return 0;
+                } else {  // Read
+                    return 0xFF;  // Reads from 0xFF50 typically return 0xFF
+                }
+            }
+
             // FIXME: Maybe change this so it's just all done in Memory block? Not sure the clean way to do this...
             if (addr <= 0xFF3F) {
                 return mmio->access(addr, read_nwr, val);
@@ -193,6 +218,29 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
 
     uint8_t Memory::get(int addr) {
         return access_memory_map(addr, 0xaf, 1);
+    }
+
+    void Memory::load_boot_rom() {
+        std::string boot_rom_path = "test-roms/dmg_boot_rom.gb"; 
+    
+        print ("Loading Boot ROM from %s....\n", boot_rom_path.c_str());
+
+        std::ifstream file(boot_rom_path, std::ios::binary);
+        if (!file.is_open()) {
+            std::cerr << "Error: Could not open boot ROM file src/dmg_boot.bin" << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+
+        // Read the 256 bytes of boot ROM
+        file.read(reinterpret_cast<char*>(boot_rom.data()), 256);
+
+        if (!file) {
+            std::cerr << "Error: Failed to read boot ROM (expected 256 bytes)" << std::endl;
+            std::exit(EXIT_FAILURE);
+        }
+
+        file.close();
+        print ("Successfully loaded Boot ROM!\n\n");
     }
 
     void Memory::load_rom(uint8_t *rom_ptr, size_t file_size) {
