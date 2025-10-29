@@ -54,10 +54,6 @@ void Debug::set_breakpoint(std::string msg) {
     bp_info.msg = msg;
 }
 
-
-// Move this to a separate file so I can keep track of all the global vars easier
-// Can also use the vars to interract with the program automatically
-// num_steps_left, breakpoint, run, clk_cnt, tg_instr etc etc
 void Debug::debugger_break(CPU &cpu) {
     instr_cnt++;
 
@@ -173,9 +169,11 @@ void Debug::debugger_break(CPU &cpu) {
                 bp_info.disable_breakpoints = !bp_info.disable_breakpoints;
                 printx ("disable_breakpoints <= %0d\n", bp_info.disable_breakpoints);
             } else if (dbg_cmd[0] == 'r') {
-                // DEBUGGER = false;   // disable debugger for rest of the run
                 exit_debugger = true;
                 run = true;
+                if (dbg_cmd[1] == 'q') {        // Run quietly
+                    PRINT_REGS_EN = false;
+                }
             } else if (dbg_cmd[0] == 'l') {
                 // Line Count
                 printx("Instr count = %lu\n", instr_cnt);

@@ -22,7 +22,7 @@ class LCD {
         0x000000FF  // Black
     };
 
-    void print_framebuffer();
+    void log_framebuffer();
 
 public:
     SDL_Window* window      = nullptr;

@@ -55,7 +55,6 @@ typedef struct {
 
 class Debug {
 public:
-    // Color last_framebuffer[144][160];
 
     unsigned long instr_cnt = 0;
     unsigned long mcycle_cnt = 0;
@@ -67,6 +66,10 @@ public:
     TargetPC tgt_pc;
     BreakpointInfo bp_info;
     PerfMetrics perf;
+
+#ifndef REL_MODE
+    Color last_framebuffer[144][160];       // Prob bad for perf
+#endif
 
     bool disable_interrupts = false;
 

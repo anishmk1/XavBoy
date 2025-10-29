@@ -37,9 +37,12 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
     uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
     framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
-    if (dbg->frame_cnt == 1) {
-        // dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
-    }
+    // if (dbg->frame_cnt == 1) {
+#ifndef REL_MODE
+    dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
+#endif
+    // }
+
 
     // Manage frame buffer pointers
     if (framebuffer_write_ptr_x == (SCREEN_WIDTH-1)) {
@@ -65,7 +68,7 @@ void LCD::close_window() {
     if (CPU_ONLY) return;
 
     // Print out current framebuffer contents for debug
-    // print_framebuffer();
+    // log_framebuffer();
 
     // Clean up
     SDL_DestroyWindow(window);
@@ -74,19 +77,26 @@ void LCD::close_window() {
     // std::exit(EXIT_SUCCESS);
 }
 
-// void LCD::print_framebuffer() {
+void LCD::log_framebuffer() {
 
-//     for (int y = 0; y < SCREEN_HEIGHT; y++) {
-//         for (int x = 0; x < SCREEN_WIDTH; x++) {
-//             pixel_map << static_cast<int>(dbg->last_framebuffer[y][x]) << " ";
-//         }
-//         pixel_map << std::endl;
-//     }
-// }
+    pixel_map.close();
+    pixel_map.open("logs/pixel_map.log", std::ios::trunc);
+
+    for (int y = 0; y < SCREEN_HEIGHT; y++) {
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            pixel_map << static_cast<int>(dbg->last_framebuffer[y][x]) << " ";
+        }
+        pixel_map << std::endl;
+    }
+}
 
 void LCD::draw_frame() {
     if (CPU_ONLY) return;
     this->frame_ready = false;
+
+    #ifndef REL_MODE
+    lcd->log_framebuffer();
+    #endif
     
     // debug_file << "     [draw_frame] Abt to SDL_UpdateTexture" << std::endl;
     // debug_file << "     [draw_frame] texture == nullptr ? " << (texture == nullptr) << std::endl;
