@@ -217,13 +217,15 @@ void PPU::fetch_pixel(int pixel_x) {
         DBG( std::endl);
         DBG( std::endl);
         // DBG( "      New tile - fetching info below" << std::endl);
-        DBG( "      tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tild_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
+        DBG( "      tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
         // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
         DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
         std::string debug_str = "";
         for (int i = 0; i < 16; i++) {
-            debug_str += (std::to_string(static_cast<int>(tile_data[i])) + " ");
+            char buf[4];
+            sprintf(buf, "%02X ", tile_data[i]);
+            debug_str += buf;
         }
 
         DBG( "      Tile_data = " << debug_str << std::endl);
@@ -234,13 +236,13 @@ void PPU::fetch_pixel(int pixel_x) {
 
 
     // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
-    int tile_local_y = ly % 8;      // ly is y coord across all tiles - what is the y relative to the current tile?
+    int tile_local_y = (scy + ly) % 8;      // which row of the current tile does this pixel lie in?
     uint8_t lsb_byte = tile_data[2*tile_local_y];
     uint8_t msb_byte = tile_data[2*tile_local_y + 1];
 
-    int pixel_local_x = pixel_x % 8;
-    int color_id_lsb = (lsb_byte >> (7 - pixel_local_x)) & 0b1;
-    int color_id_msb = (msb_byte >> (7 - pixel_local_x)) & 0b1;
+    int tile_local_x = (scx + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
+    int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
+    int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
     int color_id = color_id_lsb + (color_id_msb << 1);
 
     Pixel pxl;
@@ -291,6 +293,7 @@ void PPU::ppu_tick(int mcycles){
             case PPUMode::OAM_SCAN: {
                 if (curr_LY == 0 && dot_cnt == 1) {
                     DBG("Frame: " << dbg->frame_cnt << std::endl);
+                    DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl << std::endl);
                     // // -------------------------- REMOVE -------
                     // if (dbg->frame_cnt == 2) {
                     //     std::exit(EXIT_SUCCESS);

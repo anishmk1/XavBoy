@@ -82,9 +82,48 @@ void LCD::log_framebuffer() {
     pixel_map.close();
     pixel_map.open("logs/pixel_map.log", std::ios::trunc);
 
-    for (int y = 0; y < SCREEN_HEIGHT; y++) {
-        for (int x = 0; x < SCREEN_WIDTH; x++) {
-            pixel_map << static_cast<int>(dbg->last_framebuffer[y][x]) << " ";
+    // Read scroll registers to determine where tile boundaries should be
+    uint8_t scx = mem->get(REG_SCX);
+    uint8_t scy = mem->get(REG_SCY);
+
+    // Print out X Column headers with proper spacing based on scroll
+    pixel_map << "   ";
+    for (int screen_x = 0; screen_x < SCREEN_WIDTH; screen_x++) {
+        // Place divider if this screen pixel aligns with a tile boundary in the tilemap
+        if ((scx + screen_x) % 8 == 0) {
+            pixel_map << "  ";
+        }
+        pixel_map << static_cast<int>(screen_x % 8) << " ";
+    }
+    pixel_map << std::endl;
+
+    // Print separator line
+    pixel_map << "   ";
+    for (int screen_x = 0; screen_x < SCREEN_WIDTH; screen_x++) {
+        if ((scx + screen_x) % 8 == 0) {
+            pixel_map << "  ";
+        }
+        pixel_map << "--";
+    }
+    pixel_map << std::endl;
+
+    // Print out the grid with proper tile boundary delimiters
+    for (int screen_y = 0; screen_y < SCREEN_HEIGHT; screen_y++) {
+        // Add blank row for horizontal tile boundaries
+        if ((scy + screen_y) % 8 == 0 && screen_y > 0) {
+            pixel_map << std::endl;
+        }
+
+        // Print out Row header
+        if (screen_y < 10) {pixel_map << " ";}
+        pixel_map << static_cast<int>(screen_y) << " ";
+
+        for (int screen_x = 0; screen_x < SCREEN_WIDTH; screen_x++) {
+            // Place vertical divider if this aligns with a tile boundary
+            if ((scx + screen_x) % 8 == 0) {
+                pixel_map << "  ";
+            }
+            pixel_map << static_cast<unsigned int>(dbg->last_framebuffer[screen_y][screen_x]) << " ";
         }
         pixel_map << std::endl;
     }

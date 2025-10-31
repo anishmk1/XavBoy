@@ -67,9 +67,7 @@ public:
     BreakpointInfo bp_info;
     PerfMetrics perf;
 
-#ifndef REL_MODE
-    Color last_framebuffer[144][160];       // Prob bad for perf
-#endif
+    Color last_framebuffer[144][160];
 
     bool disable_interrupts = false;
 
