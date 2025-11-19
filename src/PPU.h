@@ -25,6 +25,13 @@ enum class PPUMode : uint8_t {
     DRAW_PIXELS = 3
 };
 
+enum class TileType : int {
+    BACKGROUND  = 0,
+    WINDOW      = 1,
+    OBJECT      = 2,
+    UNASSIGNED  = 3
+};
+
 typedef struct {
     Color color;            // a value between 0 and 3
     int palette;            // on DMG this only applies to objects
@@ -45,7 +52,12 @@ public:
 };
 
 class PPU {
+    uint8_t ly;
     FIFO pixel_fifo;
+
+    TileType get_pixel_tile_type(int pixel_x);
+    void fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
+    void fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
 
 public:
     PPUMode mode;   // 0 - HBLANK; 1 - VBLANK; 2 - OAM SCAN; 3 - DRAW PIXELS

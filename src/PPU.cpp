@@ -87,6 +87,11 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
                 print ("Attempted write to LY reg [read-only]; Dropping write\n");
                 return 0;
             }
+        } else if ((addr == REG_WY) || (addr == REG_WX)) {
+            if (this->mode != PPUMode::VBLANK) {
+                std::cerr << "FATAL ERROR (for now): Writing to WX/WY mid frame causes special behavior. Check this" << std::endl;
+                std::exit(EXIT_FAILURE);
+            }
         }
 
         if (addr == REG_LCDC) {
@@ -131,6 +136,7 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
 
 void PPU::oam_scan() {
     
+    // Maybe make use of this function somehow instead of just doing everything in fetch_pixel?
 }
 
 
@@ -150,6 +156,53 @@ void PPU::render_pixel() {
 
 }
 
+TileType PPU::get_pixel_tile_type(int pixel_x) {
+
+    if (((mem->get(REG_LCDC) >> LCDC_WINDOW_ENABLE_BIT) & 0b1)) {   // Window Enabled
+        uint8_t wy = mem->get(REG_WY);
+        uint8_t wx = mem->get(REG_WX);
+        if ((ly >= wy) && (pixel_x >= (wx - 7))) {
+            return TileType::WINDOW;
+        }
+    }
+    
+    return TileType::BACKGROUND;
+}
+
+void PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
+
+}
+
+void PPU::fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
+
+    int tile_id;
+    uint16_t tile_data_base_addr, tile_id_base_addr;
+    tile_id_base_addr = 0x9C00;
+    // FIXME: This should respond to LCDC.6 — Window tile map area
+
+    int tile_ofst_x = (pixel_x / 8);
+    int tile_ofst_y = (ly / 8);
+    // Note: 32 = the number of tiles per row - and each tile id is one byte and occuppies one mem address
+    uint16_t tile_id_addr = tile_id_base_addr + (tile_ofst_y * 32) + tile_ofst_x;
+
+    bool lcdc_4 = ((mem->get(REG_LCDC) >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
+    if (lcdc_4 == 1) {
+        // The “$8000 method” (Default): with unsigned addressing
+        tile_data_base_addr = 0x8000;
+        tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
+    } else {
+        // The “$8800 method”: with signed addressing
+        tile_data_base_addr = 0x9000;
+        tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
+    }
+
+    uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+    for (int i = 0; i < 16; i++) {
+        // Populating each byte of tile data
+        tile_data[i] = mem->get(tile_data_addr + i);
+    }
+}
+
 /**
  * Given a pixel x coordinate on the screen - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
  */
@@ -161,14 +214,34 @@ void PPU::fetch_pixel(int pixel_x) {
     static uint8_t scy, scx, lcdc;
     static std::array<uint8_t, 16> win_tile_data;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
-    uint8_t ly = mem->get(REG_LY);
+    ly = mem->get(REG_LY);
     uint8_t color_palette = mem->get(REG_BGP);
 
     uint16_t tile_data_base_addr;
-    bool lcdc_4;
+    bool lcdc_4, lcdc_5;
 
-    // New tile - re-fetch tile data
-    if (pixel_x % 8 == 0) {
+    DBG( "      pxl_x = " << std::dec << pixel_x << "; ");
+
+
+    // Algorithm
+    /**
+     * Unoptimized alg:
+     *  On every pixel figure out what tile type it is and just fetch the tile data. It will be slow.
+     *  But just get the base functionality working
+     *  Can optimize later to "decide" whether a new tile fetch is required or not
+     */
+
+
+    static TileType curr_pxl_tile_type;
+    static TileType prev_pxl_tile_type = TileType::UNASSIGNED;
+
+    curr_pxl_tile_type = get_pixel_tile_type(pixel_x);
+
+    lcdc = mem->get(REG_LCDC);
+
+    if ( curr_pxl_tile_type == TileType::BACKGROUND){
+        DBG( "         BG" << std::endl);
+        // Fetch background tile
 
         // The scroll registers are re-read on each tile fetch
         if (pixel_x == 0) {
@@ -180,7 +253,7 @@ void PPU::fetch_pixel(int pixel_x) {
         }
 
         // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
-        // Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
+        // Background tile - Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
         int scroll_adj_tile_ofst_x = (scx + pixel_x) / 8;
         int scroll_adj_tile_ofst_y = (scy + ly) / 8;
         uint16_t tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
@@ -189,13 +262,11 @@ void PPU::fetch_pixel(int pixel_x) {
         // int tile_id = mem->get(tile_id_addr);   // 8 bit number zexts to int
 
         int tile_id;
-        lcdc = mem->get(REG_LCDC);
         lcdc_4 = ((lcdc >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
         if (lcdc_4 == 1) {
             // The “$8000 method” (Default): with unsigned addressing
             tile_data_base_addr = 0x8000;
             tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
-             
         } else {
             // The “$8800 method”: with signed addressing
             tile_data_base_addr = 0x9000;
@@ -214,25 +285,27 @@ void PPU::fetch_pixel(int pixel_x) {
             tile_data[i] = mem->get(tile_data_addr + i);
         }
 
-        DBG( std::endl);
-        DBG( std::endl);
         // DBG( "      New tile - fetching info below" << std::endl);
-        DBG( "      tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
+        DBG( "         tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
         // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
         DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
-        std::string debug_str = "";
-        for (int i = 0; i < 16; i++) {
-            char buf[4];
-            sprintf(buf, "%02X ", tile_data[i]);
-            debug_str += buf;
-        }
+    } else if ( curr_pxl_tile_type == TileType::WINDOW) {
+        DBG( "         WIN" << std::endl);
 
-        DBG( "      Tile_data = " << debug_str << std::endl);
-        DBG( "      pxl_x = ");
+        // Fetch window tile
+        fetch_window_tile(pixel_x, tile_data);
     }
 
-    DBG( std::dec << pixel_x << ", ");
+    std::string debug_str = "";
+    for (int i = 0; i < 16; i++) {
+        char buf[4];
+        sprintf(buf, "%02X ", tile_data[i]);
+        debug_str += buf;
+    }
+    DBG( "         Tile_data = " << debug_str << std::endl);
+
+    prev_pxl_tile_type = curr_pxl_tile_type;
 
 
     // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
@@ -293,7 +366,8 @@ void PPU::ppu_tick(int mcycles){
             case PPUMode::OAM_SCAN: {
                 if (curr_LY == 0 && dot_cnt == 1) {
                     DBG("Frame: " << dbg->frame_cnt << std::endl);
-                    DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl << std::endl);
+                    DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl);
+                    DBG("   WX  = " << static_cast<int>(mem->get(REG_WX)) << "; WY = " << static_cast<int>(mem->get(REG_WY)) << std::endl << std::endl);
                     // // -------------------------- REMOVE -------
                     // if (dbg->frame_cnt == 2) {
                     //     std::exit(EXIT_SUCCESS);
@@ -312,7 +386,7 @@ void PPU::ppu_tick(int mcycles){
 
             case PPUMode::DRAW_PIXELS: {
                 if (dot_cnt == 81) {
-                    DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: Start fetching and rendering pixels @ mcycle = " << dbg->mcycle_cnt);
+                    DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: Start fetching and rendering pixels @ mcycle = " << dbg->mcycle_cnt << std::endl);
                 }
 
                 render_pixel();

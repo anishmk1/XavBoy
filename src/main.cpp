@@ -157,9 +157,10 @@ int emulate(int argc, char* argv[]) {
     // ------------------------------- GRAPHICS TEST ROMS -------------------------------------------
     // rom_path = "test-roms/graphics-test-roms/blank_screen.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands.gb";
-    rom_path = "test-roms/graphics-test-roms/color_bands_lcdc4_0.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_bands_lcdc4_0.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
+    rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------

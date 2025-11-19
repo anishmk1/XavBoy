@@ -18,11 +18,13 @@ const uint16_t REG_LY   = 0xff44;   // LCD Y co-ordinate [read-only]
 const uint16_t REG_BGP  = 0xff47;   // BG Palette Data
 const uint16_t REG_SCY  = 0xff42;   // Background viewport Y position
 const uint16_t REG_SCX  = 0xff43;   // Background viewport X position
+const uint16_t REG_WY   = 0xff4a;   // Window Y position
+const uint16_t REG_WX   = 0xff4b;   // Window X position + 7
 
 // LCDC Register fields
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
-// constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 1 << 6;   // Bit 6
-// constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 1 << 5;   // Bit 5
+constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 6;   // Bit 6
+constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 5;   // Bit 5
 constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 4;   // Bit 4
 // constexpr uint8_t LCDC_BG_TILEMAP_BIT        = 1 << 3;   // Bit 3
 // constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 1 << 2;   // Bit 2

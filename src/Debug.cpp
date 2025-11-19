@@ -82,7 +82,7 @@ void Debug::debugger_break(CPU &cpu) {
     if (tgt_pc.valid) {
         if (cpu.rf.get(PC) == tgt_pc.pc) {
             break_execution = true;
-            tgt_pc.valid = true;
+            tgt_pc.valid = false;
         } else {
             break_execution = false;
         }
