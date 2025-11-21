@@ -64,6 +64,8 @@ public:
     uint8_t tgt_instr;
     // uint8_t tgt_pc;
     TargetPC tgt_pc;
+    unsigned long tgt_frame_cnt;
+    bool tgt_frame_valid;
     BreakpointInfo bp_info;
     PerfMetrics perf;
 

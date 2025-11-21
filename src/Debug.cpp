@@ -15,6 +15,8 @@ Debug::Debug() {
     run = false;
     tgt_pc.valid = 0;
     tgt_instr = 0xd3;   // Init to some illegal value that I would never target
+    tgt_frame_cnt = 0;
+    tgt_frame_valid = false;
     bp_info.breakpoint = false;
     bp_info.disable_breakpoints = false;
 
@@ -87,6 +89,16 @@ void Debug::debugger_break(CPU &cpu) {
             break_execution = false;
         }
     }
+    // If target frame is reached, break execution (priority = 2)
+    if (tgt_frame_valid) {
+        if (frame_cnt >= tgt_frame_cnt) {
+            break_execution = true;
+            tgt_frame_valid = false;
+            printx ("Reached target frame %0lu\n", frame_cnt);
+        } else {
+            break_execution = false;
+        }
+    }
     // If breakpoint is triggered in code, break execution (priority = 1)
     if (!bp_info.disable_breakpoints && bp_info.breakpoint) {
         printx ("Hit breakpoint! \"%s\" @ mcycle=%0lu\n", bp_info.msg.c_str(), mcycle_cnt);
@@ -95,7 +107,19 @@ void Debug::debugger_break(CPU &cpu) {
         num_steps_left = 0;
         tgt_instr = 0xd3;
         tgt_pc.valid = false;
+        tgt_frame_valid = false;
     }
+
+
+
+     * CURRENTLY STUCK - 
+     * WHY ISNT THE PROGRAM GOING TO THE VBLANK INTERRUPT HANDLER ? 
+     * SPC 0040 WAS HAPPENING BEFORE FRAME 20 - BUT THE BREAKPOINTS WERE NOT TRIGGERING FOR SOME REASON?
+     * ALSO AFTER F20, SPC 0040 ISNT EVEN HAPPENING ANYMORE.
+     * 2 UNEXPECTED THINGS HAPPENING...
+
+
+
 
 
     // Break CPU execution for debugging
@@ -109,7 +133,13 @@ void Debug::debugger_break(CPU &cpu) {
             if (words.empty()) continue;
 
             if (dbg_cmd[0] == 'h') {    // help
-                printx ("Debug commands: 'sx'(step); 'r'(run); 'p'(print regs); 'mxxxx'(Read mem addr)\n");
+                printx ("Debug commands:\n");
+                printx ("  sx      - step x instructions\n");
+                printx ("  r       - run continuously\n");
+                printx ("  p       - print registers\n");
+                printx ("  mxxxx   - read memory at address xxxx\n");
+                printx ("  fx      - skip x frames (e.g., f1, f5, f18)\n");
+                printx ("  l       - show instruction count\n");
             } else if (std::tolower(dbg_cmd[0]) == 's') {
                 // prints state of regs and PC THAT WERE EXECUTED
                 if (std::islower(dbg_cmd[0])) PRINT_REGS_EN = false; // Step quietly (dont print regs with each step)
@@ -140,6 +170,7 @@ void Debug::debugger_break(CPU &cpu) {
             } else if (dbg_cmd[0] == 'p') {
                 // prints state of regs and pc ABOUT TO BE EXECUTED
                 cpu.rf.print_regs();
+                printx ("IME = 0x%0x\n", mmio->IME);
             } else if (dbg_cmd[0] == 'm') {
                 if (dbg_cmd.size() == 5) {
                     int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);
@@ -177,8 +208,20 @@ void Debug::debugger_break(CPU &cpu) {
             } else if (dbg_cmd[0] == 'l') {
                 // Line Count
                 printx("Instr count = %lu\n", instr_cnt);
+            } else if (dbg_cmd[0] == 'f') {
+                // Frame skip - skip N frames
+                if (dbg_cmd.size() > 1) {
+                    int frames_to_skip = std::stoi(dbg_cmd.substr(1));
+                    tgt_frame_cnt = frame_cnt + frames_to_skip;
+                    tgt_frame_valid = true;
+                    PRINT_REGS_EN = false;  // Run quietly when skipping frames
+                    printx("Skipping %d frames (current=%lu, target=%lu)\n", frames_to_skip, frame_cnt, tgt_frame_cnt);
+                    exit_debugger = true;
+                } else {
+                    printx("Current frame count = %lu\n", frame_cnt);
+                }
             }
-            
+
         } while (exit_debugger == false);
 
     }

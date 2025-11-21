@@ -160,7 +160,8 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_bands_lcdc4_0.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
-    rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
+    rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------
@@ -187,7 +188,7 @@ int emulate(int argc, char* argv[]) {
     rom_ptr = open_rom(rom_path.c_str(), &file_size);
 
     if (rom_ptr == nullptr) {
-        std::cerr << "Error opening the file!" << std::endl;
+        std::cerr << "Error opening the file!" << rom_path << std::endl;
         return 1;
     }
 
@@ -249,10 +250,15 @@ int emulate(int argc, char* argv[]) {
         }
 
         // BREAKPOINT SETTING
-        // if (mem->get(0xfffe) == 0xac) {
-        //     dbg->bp_info.breakpoint = true;
-        //     dbg->bp_info.msg = "BPT 2: In ExitLoop after enabling LCD";
-        // }
+        if (mem->get(0xfffe) == 0xac) {
+            // dbg->bp_info.breakpoint = true;
+            // dbg->bp_info.msg = "BPT: In .updateWX after storing a in RAM";
+            dbg->set_breakpoint("BPT 2: In .updateWX after storing a in RAM");
+        } else if (mem->get(0xfffe) == 0xab) {
+            dbg->set_breakpoint("BPT 1: In VBlankHandler");
+        } else if (mem->get(0xfffe) == 0xaa) {
+            dbg->set_breakpoint("BPT 0: Before VBlankHandler Label");
+        }
 
         // dbg->start_section_timing();
         dbg->debugger_break(*cpu);

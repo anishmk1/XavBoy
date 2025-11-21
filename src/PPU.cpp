@@ -201,6 +201,9 @@ void PPU::fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
         // Populating each byte of tile data
         tile_data[i] = mem->get(tile_data_addr + i);
     }
+
+    DBG( "         tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
+    DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 }
 
 /**
@@ -232,6 +235,7 @@ void PPU::fetch_pixel(int pixel_x) {
      *  But just get the base functionality working
      *  Can optimize later to "decide" whether a new tile fetch is required or not
      */
+    bool fetched_new_tile = false;
 
 
     static TileType prev_pxl_tile_type = TileType::UNASSIGNED;
@@ -304,6 +308,7 @@ void PPU::fetch_pixel(int pixel_x) {
             // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
             DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
 
+            fetched_new_tile = true;
         }
     } else if (curr_pxl_tile_type == TileType::WINDOW) {
         if ((pixel_x - (wx-7)) % 8 == 0) {
@@ -311,16 +316,22 @@ void PPU::fetch_pixel(int pixel_x) {
 
             // Fetch window tile
             fetch_window_tile(pixel_x, tile_data);
+
+            fetched_new_tile = true;
         }
     }
 
-    std::string debug_str = "";
-    for (int i = 0; i < 16; i++) {
-        char buf[4];
-        sprintf(buf, "%02X ", tile_data[i]);
-        debug_str += buf;
+    if (fetched_new_tile) {
+        std::string debug_str = "";
+        for (int i = 0; i < 16; i++) {
+            char buf[4];
+            sprintf(buf, "%02X ", tile_data[i]);
+            debug_str += buf;
+        }
+        DBG( "         Tile_data = " << debug_str << std::endl);
+    } else {
+        DBG( std::endl);
     }
-    DBG( "         Tile_data = " << debug_str << std::endl);
 
     prev_pxl_tile_type = curr_pxl_tile_type;
 

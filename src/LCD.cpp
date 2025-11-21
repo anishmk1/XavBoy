@@ -193,7 +193,7 @@ void LCD::draw_frame() {
     // Show it
     SDL_RenderPresent(renderer);
 
-    dbg->set_breakpoint("draw_frame");
+    // dbg->set_breakpoint("draw_frame");
 }
 
 
