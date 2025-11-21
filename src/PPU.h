@@ -2,6 +2,8 @@
 #ifndef PPU_H
 #define PPU_H
 
+#include <array>
+
 #define FIFO_DEPTH 16
 
 enum class Color : uint8_t {
@@ -59,7 +61,7 @@ class PPU {
 
     TileType get_pixel_tile_type(int pixel_x);
     void fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
-    void fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
+    // void fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
 
 public:
     PPUMode mode;   // 0 - HBLANK; 1 - VBLANK; 2 - OAM SCAN; 3 - DRAW PIXELS
