@@ -53,6 +53,8 @@ public:
 
 class PPU {
     uint8_t ly;
+    uint8_t wx;
+    uint8_t wy;
     FIFO pixel_fifo;
 
     TileType get_pixel_tile_type(int pixel_x);

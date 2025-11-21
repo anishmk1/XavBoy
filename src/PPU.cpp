@@ -215,6 +215,8 @@ void PPU::fetch_pixel(int pixel_x) {
     static std::array<uint8_t, 16> win_tile_data;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     ly = mem->get(REG_LY);
+    wx = mem->get(REG_WX);
+    wy = mem->get(REG_WY);
     uint8_t color_palette = mem->get(REG_BGP);
 
     uint16_t tile_data_base_addr;
@@ -232,12 +234,25 @@ void PPU::fetch_pixel(int pixel_x) {
      */
 
 
-    static TileType curr_pxl_tile_type;
     static TileType prev_pxl_tile_type = TileType::UNASSIGNED;
+    TileType curr_pxl_tile_type;
 
     curr_pxl_tile_type = get_pixel_tile_type(pixel_x);
 
     lcdc = mem->get(REG_LCDC);
+
+    if ((curr_pxl_tile_type != prev_pxl_tile_type) || 
+        ((curr_pxl_tile_type == TileType::BACKGROUND) && ((pixel_x + scx) % 8 == 0)) ||
+        ((curr_pxl_tile_type == TileType::WINDOW) && ((pixel_x - (wx-7)) % 8 == 0))){
+
+    // Condition for fetching a new tile
+
+
+    // 0 1 2 3 4 5 6 7 8 9 10 11
+    // b b b w w w w w w w w          => WX = 10. boundary is at 3, 11. 
+    // b b b b b b . . . . .  .       => SCX = 2. boundary is at 6. pixel_x = 6 + scx should hit multiples of 8
+
+    }
 
     if ( curr_pxl_tile_type == TileType::BACKGROUND){
         DBG( "         BG" << std::endl);
