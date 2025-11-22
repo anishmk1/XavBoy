@@ -178,42 +178,6 @@ TileType PPU::get_pixel_tile_type(int pixel_x) {
     return TileType::BACKGROUND;
 }
 
-// void PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
-
-// }
-
-void PPU::fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
-
-    int tile_id;
-    uint16_t tile_data_base_addr, tile_id_base_addr;
-    tile_id_base_addr = 0x9C00;
-    // FIXME: This should respond to LCDC.6 — Window tile map area
-
-    int tile_ofst_x = (pixel_x / 8);
-    int tile_ofst_y = (ly / 8);
-    // Note: 32 = the number of tiles per row - and each tile id is one byte and occuppies one mem address
-    uint16_t tile_id_addr = tile_id_base_addr + (tile_ofst_y * 32) + tile_ofst_x;
-
-    bool lcdc_4 = ((mem->get(REG_LCDC) >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
-    if (lcdc_4 == 1) {
-        // The “$8000 method” (Default): with unsigned addressing
-        tile_data_base_addr = 0x8000;
-        tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
-    } else {
-        // The “$8800 method”: with signed addressing
-        tile_data_base_addr = 0x9000;
-        tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
-    }
-
-    uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
-    for (int i = 0; i < 16; i++) {
-        // Populating each byte of tile data
-        tile_data[i] = mem->get(tile_data_addr + i);
-    }
-
-    DBG( "         tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
-    DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
-}
 
 /**
  * Given a pixel x coordinate on the screen - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
@@ -244,7 +208,7 @@ void PPU::fetch_pixel(int pixel_x) {
      *  But just get the base functionality working
      *  Can optimize later to "decide" whether a new tile fetch is required or not
      */
-    bool fetched_new_tile = false;
+    bool fetching_new_tile = false;
 
 
     static TileType prev_pxl_tile_type = TileType::UNASSIGNED;
@@ -265,6 +229,8 @@ void PPU::fetch_pixel(int pixel_x) {
         // b b b w w w w w w w w          => WX = 10. boundary is at 3, 11. 
         // b b b b b b . . . . .  .       => SCX = 2. boundary is at 6. pixel_x = 6 + scx should hit multiples of 8
 
+    uint16_t tile_id_addr;    
+
     if (curr_pxl_tile_type == TileType::BACKGROUND){
         if (((pixel_x + scx) % 8 == 0)) {
             DBG( "         BG" << std::endl);
@@ -283,54 +249,47 @@ void PPU::fetch_pixel(int pixel_x) {
             // Background tile - Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
             int scroll_adj_tile_ofst_x = (scx + pixel_x) / 8;
             int scroll_adj_tile_ofst_y = (scy + ly) / 8;
-            uint16_t tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
+            tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
 
-            // uint8_t tile_id = mem->get(tile_id_addr);   // 8 bit number (0-255)
-            // int tile_id = mem->get(tile_id_addr);   // 8 bit number zexts to int
-
-            int tile_id;
-            lcdc_4 = ((lcdc >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
-            if (lcdc_4 == 1) {
-                // The “$8000 method” (Default): with unsigned addressing
-                tile_data_base_addr = 0x8000;
-                tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
-            } else {
-                // The “$8800 method”: with signed addressing
-                tile_data_base_addr = 0x9000;
-                tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
-            }
-
-
-            // Then fetch what that tile looks like from Memory.
-            // Get the 16 byte data (each pixel is 2 bits. 8x8 = 64 pixels => 128 bits => 128/8 = 16 bytes)
-            // FIXME: figure out the correct Tile Data base addr based on register configuration
-            // uint16_t tile_data_addr = 0x9000 + (tile_id * 16);       // 0x9000 = base addr for VRAM Tile Data for (BG/WIN when LCDC.4 is 0 and Using unsigned tile addressign mode)
-            // uint16_t tile_data_addr = 0x8000 + (tile_id * 16);
-            uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
-            for (int i = 0; i < 16; i++) {
-                // Populating each byte of tile data
-                tile_data[i] = mem->get(tile_data_addr + i);
-            }
-
-            // DBG( "      New tile - fetching info below" << std::endl);
-            DBG( "         tile_id_addr = 0x" << std::hex << static_cast<int>(tile_id_addr) << "; tile_id RAW = 0x" << static_cast<int>(mem->get(tile_id_addr)) << "; ");
-            // DBG( "      tile_x = " << tile_x << "; SCY=" << static_cast<int>(scy) << "; tile_id_addr = 0x" << std::hex << tile_id_addr << std::endl);
-            DBG( "tile_id = " << tile_id << "; tile_data_addr = 0x" << tile_data_addr << std::endl);
-
-            fetched_new_tile = true;
+            fetching_new_tile = true;
         }
     } else if (curr_pxl_tile_type == TileType::WINDOW) {
         if ((pixel_x - (wx-7)) % 8 == 0) {
             DBG( "         WIN" << std::endl);
 
-            // Fetch window tile
-            fetch_window_tile(pixel_x, tile_data);
+            uint16_t tile_id_base_addr = 0x9C00;
+            // FIXME: This should respond to LCDC.6 — Window tile map area
 
-            fetched_new_tile = true;
+            int tile_ofst_x = (pixel_x / 8);
+            int tile_ofst_y = (ly / 8);
+            // Note: 32 = the number of tiles per row - and each tile id is one byte and occuppies one mem address
+            tile_id_addr = tile_id_base_addr + (tile_ofst_y * 32) + tile_ofst_x;
+
+            fetching_new_tile = true;
         }
     }
 
-    if (fetched_new_tile) {
+    if (fetching_new_tile) {
+        int tile_id;
+
+        bool lcdc_4 = ((mem->get(REG_LCDC) >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
+        if (lcdc_4 == 1) {
+            // The “$8000 method” (Default): with unsigned addressing
+            tile_data_base_addr = 0x8000;
+            tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
+        } else {
+            // The “$8800 method”: with signed addressing
+            tile_data_base_addr = 0x9000;
+            tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
+        }
+
+
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+        for (int i = 0; i < 16; i++) {
+            // Populating each byte of tile data
+            tile_data[i] = mem->get(tile_data_addr + i);
+        }
+
         std::string debug_str = "";
         for (int i = 0; i < 16; i++) {
             char buf[4];

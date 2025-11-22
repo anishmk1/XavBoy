@@ -60,7 +60,6 @@ class PPU {
     FIFO pixel_fifo;
 
     TileType get_pixel_tile_type(int pixel_x);
-    void fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
     // void fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
 
 public:
