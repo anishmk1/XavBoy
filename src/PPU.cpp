@@ -71,10 +71,14 @@ PPU::PPU() {
 
 
 uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
-    if (read_nwr) {         // Read
-//     return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
+    if (read_nwr) {
+    // ------------------- READS -------------------
+        // return 0x90;    // LY Register - 0x90 (144) is just before VBlank. This tricks games into thinking the screen is ready to draw. Remove once ppu/Vblank is implemented.
         return mem->memory[addr];
-    } else {                // Write
+    } else {
+    
+    // ------------------- WRITES ------------------
+
         if (addr == REG_LCDC) {
             if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
                 ((val & LCDC_ENABLE_BIT) == 0) &&
@@ -82,6 +86,11 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
                     std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
                     std::exit(EXIT_FAILURE);
             }
+        } else if (addr == REG_STAT) {
+            // Keep Read-Only bits [2:0] unchanged 
+            uint8_t curr_ro_value = mem->get(REG_STAT) & 0b00000111;
+            val &= 0b11111000;
+            val |= curr_ro_value;
         } else if (addr == REG_LY) {
             if (!backdoor) {
                 print ("Attempted write to LY reg [read-only]; Dropping write\n");
@@ -374,6 +383,7 @@ void PPU::ppu_tick(int mcycles){
     }
     #endif
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
     
     mcycle_cnt += mcycles;

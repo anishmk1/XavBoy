@@ -35,6 +35,7 @@ public:
     void write_to_framebuffer(Pixel& pxl);
     void test_write_to_fb();
     void draw_frame();
+    void lcd_status_update();
     int get_fb_x();
     int get_fb_y();
 };

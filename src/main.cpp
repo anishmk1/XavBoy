@@ -230,6 +230,7 @@ int emulate(int argc, char* argv[]) {
 
         dbg->perf.num_main_loops++;
 
+        lcd->lcd_status_update();
         if (lcd->frame_ready) {
             // Poll SDL events once per frame for better WSL2 performance
             // dbg->start_section_timing();

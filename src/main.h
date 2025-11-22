@@ -14,7 +14,9 @@
 
 // LCD Register addresses
 const uint16_t REG_LCDC = 0xff40;   // LCD control
+const uint16_t REG_STAT = 0xff41;   // LCD status
 const uint16_t REG_LY   = 0xff44;   // LCD Y co-ordinate [read-only]
+const uint16_t REG_LYC  = 0xff45;   // LY compare
 const uint16_t REG_BGP  = 0xff47;   // BG Palette Data
 const uint16_t REG_SCY  = 0xff42;   // Background viewport Y position
 const uint16_t REG_SCX  = 0xff43;   // Background viewport X position

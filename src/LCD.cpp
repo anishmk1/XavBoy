@@ -19,6 +19,43 @@ void LCD::test_write_to_fb() {
     }
 }
 
+void LCD::lcd_status_update() {
+
+    // ---------------- Update STAT reg ---------------- //
+    uint8_t lcd_stat = mem->get(REG_STAT);
+    
+    // LYC == LY?
+    if (mem->get(REG_LYC) == mem->get(REG_LY)) {
+        lcd_stat |= (0x01 << 2);
+    }
+
+    // Lcd Status bits [1:0] = ppu_mode
+    bool ppu_enabled = (mem->get(REG_LCDC) & LCDC_ENABLE_BIT);
+    if (ppu_enabled) {
+        lcd_stat &= 0b11111100;
+        lcd_stat |= static_cast<unsigned int>(ppu->mode);
+    } else {
+        lcd_stat &= 0b11111100;
+    }
+
+    mem->set(REG_STAT, lcd_stat);
+
+    // ---------------- Request interrupts ---------------- //
+    bool req_stat_interrupt = false;
+
+    req_stat_interrupt |= ((static_cast<unsigned int>(ppu->mode) == 0) && ((lcd_stat >> 3) & 0b1));     // Mode 0 interrupt selected (based on STAT[3])
+    req_stat_interrupt |= ((static_cast<unsigned int>(ppu->mode) == 1) && ((lcd_stat >> 4) & 0b1));     // Mode 1 interrupt selected (based on STAT[4])
+    req_stat_interrupt |= ((static_cast<unsigned int>(ppu->mode) == 2) && ((lcd_stat >> 5) & 0b1));     // Mode 2 interrupt selected (based on STAT[5])
+    req_stat_interrupt |= (((lcd_stat >> 2) & 0b1) && ((lcd_stat >> 6) & 0b1));                         // LYC interrupt selected    (based on STAT[6])
+
+    if (req_stat_interrupt) {
+        uint8_t req_lcd_int = mem->get(REG_STAT);
+        req_lcd_int |= (0x01 << 1);
+        mem->set(REG_IF, req_lcd_int);
+    }
+
+}
+
 int LCD::get_fb_x() {return this->framebuffer_write_ptr_x;}
 int LCD::get_fb_y() {return this->framebuffer_write_ptr_y;}
 
