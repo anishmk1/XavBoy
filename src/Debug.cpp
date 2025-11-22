@@ -56,7 +56,7 @@ void Debug::set_breakpoint(std::string msg) {
     bp_info.msg = msg;
 }
 
-void Debug::debugger_break(CPU &cpu) {
+void Debug::debugger_break() {
     instr_cnt++;
 
     if (DEBUGGER == false) return;
@@ -74,7 +74,7 @@ void Debug::debugger_break(CPU &cpu) {
     }
     // If requested instruction is found, break execution (priority = 2)
     if (tgt_instr != 0xd3) {
-        if (mem->get(cpu.rf.get(PC)) == tgt_instr) {
+        if (mem->get(cpu->rf.get(PC)) == tgt_instr) {
             break_execution = true;
             tgt_instr = 0xd3;
         } else {
@@ -82,7 +82,7 @@ void Debug::debugger_break(CPU &cpu) {
         }
     }
     if (tgt_pc.valid) {
-        if (cpu.rf.get(PC) == tgt_pc.pc) {
+        if (cpu->rf.get(PC) == tgt_pc.pc) {
             break_execution = true;
             tgt_pc.valid = false;
         } else {
@@ -109,14 +109,6 @@ void Debug::debugger_break(CPU &cpu) {
         tgt_pc.valid = false;
         tgt_frame_valid = false;
     }
-
-
-
-     * CURRENTLY STUCK - 
-     * WHY ISNT THE PROGRAM GOING TO THE VBLANK INTERRUPT HANDLER ? 
-     * SPC 0040 WAS HAPPENING BEFORE FRAME 20 - BUT THE BREAKPOINTS WERE NOT TRIGGERING FOR SOME REASON?
-     * ALSO AFTER F20, SPC 0040 ISNT EVEN HAPPENING ANYMORE.
-     * 2 UNEXPECTED THINGS HAPPENING...
 
 
 
@@ -169,8 +161,8 @@ void Debug::debugger_break(CPU &cpu) {
                 printx ("disable_prints <= %0d\n", disable_prints);
             } else if (dbg_cmd[0] == 'p') {
                 // prints state of regs and pc ABOUT TO BE EXECUTED
-                cpu.rf.print_regs();
-                printx ("IME = 0x%0x\n", mmio->IME);
+                cpu->rf.print_regs();
+                printx ("IME = 0x%0x; halt_mode = %0d\n", mmio->IME, cpu->halt_mode);
             } else if (dbg_cmd[0] == 'm') {
                 if (dbg_cmd.size() == 5) {
                     int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);

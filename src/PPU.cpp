@@ -428,7 +428,6 @@ void PPU::ppu_tick(int mcycles){
                 //       HBLANK timing accuracy generally doesnt matter except for niche raster/parallax effects.
                 // TODO: Should actually be variable dot cnt length based on hardware accurate fetcher/fifo modeling. And HBLANK covers the rest - low priority
                 if (dot_cnt == 280){
-                    // debug_file << "[LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl;
                     DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl);
 
                     this->mode = PPUMode::HBLANK;
@@ -446,8 +445,8 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::VBLANK;
 
-                        // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
-                        mem->set(0xfffa, 1);
+                        // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
+                        // mem->set(0xfffa, 1);
                     } else {
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::OAM_SCAN;
@@ -458,7 +457,14 @@ void PPU::ppu_tick(int mcycles){
             }
 
             case PPUMode::VBLANK: {
-                if (dot_cnt == 10) {
+                if (dot_cnt == 1) {
+                    // How was it reaching PC 0040 earlier in the program without this?
+                    // Request VBLANK interrupt
+                    uint8_t req_vblank = mem->get(REG_IF);
+                    req_vblank |= 0x01;
+                    mem->set(REG_IF, req_vblank);
+
+                } else if (dot_cnt == 10) {
                     // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
                     if (mcycle_cnt > 10) {
                         // make sure it's not VBLANK out of init

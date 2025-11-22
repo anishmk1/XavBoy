@@ -21,6 +21,9 @@ const uint16_t REG_SCX  = 0xff43;   // Background viewport X position
 const uint16_t REG_WY   = 0xff4a;   // Window Y position
 const uint16_t REG_WX   = 0xff4b;   // Window X position + 7
 
+const uint16_t REG_IF   = 0xff0f;   // Interrupt Flag
+const uint16_t REG_IE   = 0xffff;   // Interrupt Enable
+
 // LCDC Register fields
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
 constexpr uint8_t LCDC_WINDOW_TILEMAP_BIT    = 6;   // Bit 6

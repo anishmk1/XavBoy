@@ -261,7 +261,7 @@ int emulate(int argc, char* argv[]) {
         }
 
         // dbg->start_section_timing();
-        dbg->debugger_break(*cpu);
+        dbg->debugger_break();
         // dbg->end_section_timing("debugger");
 
 
