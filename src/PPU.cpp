@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <array>
 #include <string>
+#include <sstream>
+#include <iomanip>
 
 #include <cstdint>
 #include <cstdlib>
@@ -90,11 +92,15 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     // ------------------- WRITES ------------------
 
         if (addr == REG_LCDC) {
-            if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
-                ((val & LCDC_ENABLE_BIT) == 0) &&
-                (this->mode != PPUMode::VBLANK)) {
-                    std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
-                    std::exit(EXIT_FAILURE);
+            // if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
+            //     ((val & LCDC_ENABLE_BIT) == 0) &&
+            //     (this->mode != PPUMode::VBLANK)) {
+            //         std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
+            //         std::exit(EXIT_FAILURE);
+            // }
+            if (this->mode != PPUMode::VBLANK) {
+                std::cerr << "FATAL ERROR: Modifying LCD outside of VBLANK period is prohibited" << std::endl;
+                std::exit(EXIT_FAILURE);
             }
         } else if (addr == REG_STAT) {
             // Keep Read-Only bits [2:0] unchanged 
@@ -166,7 +172,14 @@ void PPU::oam_scan() {
         }
 
         // First 10 objects (in increasing memory address order) are "selected"
-        if (ly == (object_data[OBJ_Y_POS] - 16)) {
+        // FIXME: Account for sprite size
+        bool obj_size = (mem->get(REG_LCDC) >> LCDC_OBJ_SIZE_BIT) & 0x01;
+        int sprite_y_boundary = (obj_size == 1) ? (object_data[OBJ_Y_POS]) : ((object_data[OBJ_Y_POS]) - 8) ;
+
+        // DBG ("      Looking at 0x" << std::hex << static_cast<int>(oam_ptr) << ": ly=" << std::dec << static_cast<int>(ly) << "; y_pos="
+        //         << static_cast<int>(object_data[OBJ_Y_POS]) << "; sprite_y_boundary=" << sprite_y_boundary << std::endl);
+
+        if ((ly >= (object_data[OBJ_Y_POS] - 16)) && (ly < sprite_y_boundary)) {
             Object obj;
             obj.y_pos = object_data[OBJ_Y_POS];
             obj.x_pos = object_data[OBJ_X_POS];
@@ -178,15 +191,15 @@ void PPU::oam_scan() {
             obj.dmg_palette = ((object_data[OBJ_ATTR_FLAGS] >> 4) & 0x01);
 
             
-            // Trying to do a "stable" insertion sort with x_pos
-            // The original order was based on mem address
+            // Doing a "stable" insertion sort with x_pos
+            // to maintain the original order was based on mem address
             for (int i = 0; i < OBJ_FIFO_DEPTH; i++) {
                 // 0 3 3 6       -- x_pos
                 if ((obj.x_pos < objects.fifo[i].x_pos) ||      // Inserting at the 
                     (i == objects.size)) {      // Placing at the end of the list
                         
                         if (i == objects.size) {
-                            objects.fifo[i] = obj;      // FIXME double check this copies contents. No poointer magic
+                            objects.fifo[i] = obj;
                             objects.size++;
                         } else { // Shift all elements to the right by 1
                             Object out_obj;     // temp holder -> will turn into the new "in_obj" every loop
@@ -202,7 +215,9 @@ void PPU::oam_scan() {
                         break;
                 }
             }
-            DBG ("      Added OBJ " << objects.size << " from 0x" << std::hex << static_cast<int>(oam_ptr) << std::endl);
+            DBG ("      Added OBJ " << objects.size << " from 0x" << std::hex << static_cast<int>(oam_ptr) 
+                    << ": x_pos=" << std::dec << static_cast<int>(obj.x_pos) << "; y_pos=" << static_cast<int>(obj.y_pos)
+                    << "; tile_index=" << static_cast<int>(obj.tile_index) << std::endl);
         }
 
         oam_ptr += 4;
@@ -210,9 +225,9 @@ void PPU::oam_scan() {
 
     // Debug output
     DBG (std::endl << "      objects.size = " << objects.size << std::endl);
-    for (int i = 0; i < objects.size; i++) {
-        DBG ("      objects[" << i << "].x_pos = " << std::dec << static_cast<int>(objects.fifo[i].x_pos) << "; tile_index = " << static_cast<int>(objects.fifo[i].tile_index) << std::endl);
-    }
+    // for (int i = 0; i < objects.size; i++) {
+    //     DBG ("      objects[" << i << "].x_pos = " << std::dec << static_cast<int>(objects.fifo[i].x_pos) << "; tile_index = " << static_cast<int>(objects.fifo[i].tile_index) << std::endl);
+    // }
 }
 
 
@@ -263,9 +278,6 @@ void PPU::fetch_pixel(int pixel_x) {
     static uint8_t scy, scx, lcdc;
     std::ostringstream debug_oss;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
-    ly = mem->get(REG_LY);
-    wx = mem->get(REG_WX);
-    wy = mem->get(REG_WY);
     uint8_t color_palette = mem->get(REG_BGP);
 
     uint16_t tile_data_base_addr = 0;
@@ -336,6 +348,8 @@ void PPU::fetch_pixel(int pixel_x) {
             tile_id_addr = tile_id_base_addr + (tile_ofst_y * 32) + tile_ofst_x;
 
             fetching_new_tile = true;
+
+            debug_oss << "         WX=" << std::dec << static_cast<int>(wx) << "; WY=" << static_cast<int>(wy) << std::endl;
         }
     }
 
@@ -362,7 +376,6 @@ void PPU::fetch_pixel(int pixel_x) {
             tile_data[i] = mem->get(tile_data_addr + i);
         }
 
-        // std::string tile_data_str = "";
         debug_oss << "         Tile_data = ";
         for (int i = 0; i < 16; i++) {
             debug_oss << std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ";
@@ -514,15 +527,22 @@ void PPU::ppu_tick(int mcycles){
         // ------------------- //
         switch (this->mode) {
             case PPUMode::OAM_SCAN: {
-                if (curr_LY == 0 && dot_cnt == 1) {
-                    DBG("Frame: " << dbg->frame_cnt << std::endl);
-                    DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl);
-                    DBG("   WX  = " << static_cast<int>(mem->get(REG_WX)) << "; WY = " << static_cast<int>(mem->get(REG_WY)) << std::endl << std::endl);
-                    // // -------------------------- REMOVE -------
-                    // if (dbg->frame_cnt == 2) {
-                    //     std::exit(EXIT_SUCCESS);
-                    // }
-                    // // -------------------------- REMOVE -------
+                if (dot_cnt == 1) {
+
+                    ly = mem->get(REG_LY);
+                    wx = mem->get(REG_WX);
+                    wy = mem->get(REG_WY);
+
+                    if (curr_LY == 0) {
+                        DBG("Frame: " << dbg->frame_cnt << std::endl);
+                        DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl);
+                        DBG("   WX  = " << static_cast<int>(mem->get(REG_WX)) << "; WY = " << static_cast<int>(mem->get(REG_WY)) << std::endl << std::endl);
+                        // // -------------------------- REMOVE -------
+                        // if (dbg->frame_cnt == 2) {
+                        //     std::exit(EXIT_SUCCESS);
+                        // }
+                        // // -------------------------- REMOVE -------
+                    }
                 }
                 if (dot_cnt == 80) {    // Note - 80 might be off by 1..
                     DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl);

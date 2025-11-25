@@ -180,14 +180,14 @@ DrawObjects:
 
 .enableLCD
 
-    ld a, %11110011     ; LCDC configuration:   (BG and Window ON)
+    ld a, %11010011     ; LCDC configuration:   (BG and Window ON)
     ;      ||||||||
     ;      |||||||+-- Bit 0: BG Display Enable        = 1 (show background)
     ;      ||||||+--- Bit 1: OBJ (Sprite) Enable      = 1 (show sprites)
     ;      |||||+---- Bit 2: OBJ Size                 = 0 (8x8)
     ;      ||||+----- Bit 3: BG Tile Map Select       = 0 ($9800–$9BFF)
     ;      |||+------ Bit 4: BG & Window Tile Data    = 1 ($8000–$8FFF, unsigned)
-    ;      ||+------- Bit 5: Window Display Enable    = 1 (show window)
+    ;      ||+------- Bit 5: Window Display Enable    = 0 (hide window)
     ;      |+-------- Bit 6: Window Tile Map Select   = 1 ($9C00–$9FFF)
     ;      +--------- Bit 7: LCD Control Operation    = 1 (LCD on)
 
