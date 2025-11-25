@@ -254,7 +254,7 @@ void PPU::render_pixel() {
 TileType PPU::get_fallback_tile_type(int pixel_x) {
 
     uint8_t lcdc = mem->get(REG_LCDC);
-    
+
     if ((lcdc >> LCDC_WINDOW_ENABLE_BIT) & 0b1) {   // Window Enabled
         uint8_t wy = mem->get(REG_WY);
         uint8_t wx = mem->get(REG_WX);
@@ -412,6 +412,9 @@ void PPU::fetch_pixel(int pixel_x) {
         color_id = color_id_lsb + (color_id_msb << 1);
 
         DBG(debug_oss.str());
+
+        // DBG(std::endl);
+        // DBG(obj_debug_oss.str());
     }
 
     Pixel pxl;
@@ -424,7 +427,7 @@ void PPU::fetch_pixel(int pixel_x) {
 
 /**
  * Checks if the current scanline and X coordinate is covered by an object. If it is not
- * OR if the pixel corresponds to a transparent object pixel then color_id = 0 is returned.
+ * OR if it is and the pixel corresponds to a transparent object pixel then color_id = 0 is returned.
  * Caller function fetch_pixel will display the fallback (BG/WIN) pixel behind.
  */
 int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss) {
@@ -462,19 +465,14 @@ int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss) {
         }
 
         obj_debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
-        obj_debug_oss << "         Tile_data = ";
-        for (int i = 0; i < 16; i++) {
-            obj_debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " ";
-        }
-        obj_debug_oss << std::endl;
+        obj_debug_oss << "         Tile_data = "; for (int i = 0; i < 16; i++) { obj_debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "; } obj_debug_oss << std::endl;
 
-
-        // Where in the tile is this current (x,y)?
-        int tile_local_y = (ly % 8);    // Objects are unaffected by SCX/SCY like 
+        // Where in the sprite tile is this current (x,y)?
+        unsigned int tile_local_y = (ly - (obj.y_pos - 16));    // This difference is bounded by [0, 8] (or 16). 
         uint8_t lsb_byte = tile_data[2*tile_local_y];
         uint8_t msb_byte = tile_data[2*tile_local_y + 1];
 
-        int tile_local_x = (pixel_x % 8);
+        unsigned int tile_local_x = (pixel_x - (obj.x_pos - 8));
         int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
         int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
         int color_id = color_id_lsb + (color_id_msb << 1);
