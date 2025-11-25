@@ -14,6 +14,13 @@ else
 	CXX = g++
 endif
 
+# User options
+SKIP_BOOT_ROM ?= 0
+
+ifeq ($(SKIP_BOOT_ROM),1)
+    EXTRA_RUN_ARGS += --skip-boot-rom
+endif
+
 # CXX = g++
 CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
 CXXRELFLAGS = -DREL_MODE -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
@@ -33,13 +40,13 @@ release: build_release
 	@./myprogram --quiet
 
 step: clean compile link
-	@./myprogram --step
+	@./myprogram --step $(EXTRA_RUN_ARGS)
 
 debug: clean gdb
-	./myprogram --quiet
+	./myprogram --quiet $(EXTRA_RUN_ARGS)
 
 quiet: clean compile link
-	@./myprogram --quiet
+	@./myprogram --quiet $(EXTRA_RUN_ARGS)
 
 compile:
 	@$(CXX) $(CXXFLAGS) -c src/Memory.cpp -o bin/Memory.o

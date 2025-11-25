@@ -33,10 +33,19 @@ constexpr uint8_t LCDC_WINDOW_ENABLE_BIT     = 5;   // Bit 5
 constexpr uint8_t LCDC_BG_WINDOW_TILES_BIT   = 4;   // Bit 4
 // constexpr uint8_t LCDC_BG_TILEMAP_BIT        = 1 << 3;   // Bit 3
 // constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 1 << 2;   // Bit 2
-// constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1 << 1;   // Bit 1
+constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1;   // Bit 1
 // constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 1 << 0;   // Bit 0   BG & Window enable / priority
 
 
+enum ObjDataFormat : uint8_t {
+    OBJ_Y_POS       = 0,
+    OBJ_X_POS       = 1,
+    OBJ_TILE_IDX    = 2,
+    OBJ_ATTR_FLAGS  = 3
+};
+
+
+extern std::string rom_path;
 extern std::ofstream logFile;
 extern std::ofstream debug_file;
 extern std::ofstream pixel_map;
@@ -45,8 +54,8 @@ extern bool disable_prints;
 extern bool DEBUGGER;
 extern bool PRINT_REGS_EN;
 extern bool CPU_ONLY;
+extern bool SKIP_BOOT_ROM;          // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 extern const bool LOAD_BOOT_ROM;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
-extern const bool SKIP_BOOT_ROM;    // default: true; Start executing with PC at 0x100. Should mostly be true unless testing actual BOOT ROM execution
 extern const bool GAMEBOY_DOCTOR;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
 extern PPU *ppu;        // Globally referencable PPU module

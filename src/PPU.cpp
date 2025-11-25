@@ -19,47 +19,57 @@
 #include "PPU.h"
 
 
-void FIFO::print_contents() {
+template <typename T, int DEPTH>
+void FIFO<T, DEPTH>::print_contents() {
     DBG("pixel_fifo contents..." << std::endl);
-    for (int i = 0; i < FIFO_DEPTH; i++) {
-        DBG("     pixels[" << i << "] = {color=" << static_cast<int>(pixels[i].color)
-                    << "; valid=" << pixels[i].valid << "}" << std::endl);
+    // for (int i = 0; i < DEPTH; i++) {
+    //     DBG("     pixels[" << i << "] = {color=" << static_cast<int>(pixels[i].color)
+    //                 << "; valid=" << fifo[i].valid << "}" << std::endl);
+    // }
+}
+
+template <typename T, int DEPTH>
+void FIFO<T, DEPTH>::clear_fifo() {
+    for (size_t i = 0; i < DEPTH; i++) {
+        // fifo[i] = static_cast<Object>(0);
+        std::memset(&fifo[i], 0, sizeof(fifo[i]));
     }
+    size = 0;
 }
 
 
-bool FIFO::push(Pixel pxl) {
+template <typename T, int DEPTH>
+bool FIFO<T, DEPTH>::push(T el) {
 
-    if (size >= FIFO_DEPTH) {
+    if (size >= DEPTH) {
         // debug_file << "[FIFO Push] FIFO Full detected; size = " << size << std::endl;
         return false; // FIFO full
     }
 
-    pixels[size] = pxl;  // Insert at the end
+    fifo[size] = el;  // Insert at the end
     size++;
     // debug_file << "[FIFO Push] Pushed pxl.color = " << static_cast<int>(pxl.color) << "; val" << std::endl;
     return true;
 }
 
-bool FIFO::pop(Pixel& pxl) {
+template <typename T, int DEPTH>
+bool FIFO<T, DEPTH>::pop(T& el) {
 
     if (size == 0) {
         return false;
     }
 
     // Retrieve the pixel from the FRONT (index 0)
-    pxl = pixels[0];
+    el = fifo[0];
 
     // Shift everything to the left
-    for (int i = 0; i < FIFO_DEPTH - 1; ++i) {
-        pixels[i] = pixels[i + 1];
+    for (int i = 0; i < DEPTH - 1; ++i) {
+        fifo[i] = fifo[i + 1];
     }
 
     // Clear the last pixel (now empty)
-    pixels[FIFO_DEPTH - 1] = Pixel{};
+    fifo[DEPTH - 1] = Pixel{};
     size--;
-
-    assert(pxl.valid);  // sanity check we never pop out an invalid Pixel
 
     return true;
 }
@@ -145,7 +155,64 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
 
 void PPU::oam_scan() {
     
-    // Maybe make use of this function somehow instead of just doing everything in fetch_pixel?
+    uint8_t object_data[4];
+
+    uint16_t oam_ptr = 0xFE00;
+    while ((oam_ptr < 0xFE9F) && (objects.size < OBJ_FIFO_DEPTH)) {
+
+        // Load new object data
+        for (int i = 0; i < 4; i++) {
+            object_data[i] = mem->get(oam_ptr + i);
+        }
+
+        // First 10 objects (in increasing memory address order) are "selected"
+        if (ly == (object_data[OBJ_Y_POS] - 16)) {
+            Object obj;
+            obj.y_pos = object_data[OBJ_Y_POS];
+            obj.x_pos = object_data[OBJ_X_POS];
+            obj.tile_index = object_data[OBJ_TILE_IDX];
+            
+            obj.priority = ((object_data[OBJ_ATTR_FLAGS] >> 7) & 0x01);
+            obj.y_flip = ((object_data[OBJ_ATTR_FLAGS] >> 6) & 0x01);
+            obj.x_flip = ((object_data[OBJ_ATTR_FLAGS] >> 5) & 0x01);
+            obj.dmg_palette = ((object_data[OBJ_ATTR_FLAGS] >> 4) & 0x01);
+
+            
+            // Trying to do a "stable" insertion sort with x_pos
+            // The original order was based on mem address
+            for (int i = 0; i < OBJ_FIFO_DEPTH; i++) {
+                // 0 3 3 6       -- x_pos
+                if ((obj.x_pos < objects.fifo[i].x_pos) ||      // Inserting at the 
+                    (i == objects.size)) {      // Placing at the end of the list
+                        
+                        if (i == objects.size) {
+                            objects.fifo[i] = obj;      // FIXME double check this copies contents. No poointer magic
+                            objects.size++;
+                        } else { // Shift all elements to the right by 1
+                            Object out_obj;     // temp holder -> will turn into the new "in_obj" every loop
+                            Object in_obj = obj;
+                            for (int j = i; j < objects.size; j++) {
+                                out_obj = objects.fifo[j];
+                                objects.fifo[j] = in_obj;
+                                in_obj = out_obj;
+                            } 
+                            objects.fifo[objects.size++] = in_obj;
+                        }
+
+                        break;
+                }
+            }
+            DBG ("      Added OBJ " << objects.size << " from 0x" << std::hex << static_cast<int>(oam_ptr) << std::endl);
+        }
+
+        oam_ptr += 4;
+    }
+
+    // Debug output
+    DBG (std::endl << "      objects.size = " << objects.size << std::endl);
+    for (int i = 0; i < objects.size; i++) {
+        DBG ("      objects[" << i << "].x_pos = " << std::dec << static_cast<int>(objects.fifo[i].x_pos) << "; tile_index = " << static_cast<int>(objects.fifo[i].tile_index) << std::endl);
+    }
 }
 
 
@@ -153,7 +220,7 @@ void PPU::oam_scan() {
 void PPU::render_pixel() {
     Pixel pxl;
     // pixel_fifo.print_contents();
-    bool pop_result = pixel_fifo.pop(pxl);
+    bool pop_result = pixels.pop(pxl);
     // debug_file << "     [render_pixel] @" << dbg->mcycle_cnt << " mcycles:  pop_pixel_fifo returned " << pop_result << "; LY = " 
     //             << "0x" << std::hex << static_cast<int>(mem->get(REG_LY)) << std::dec << "; framebuff x,y={" << lcd->get_fb_x() << ", " << lcd->get_fb_y() << "}" << std::endl;
 
@@ -165,9 +232,15 @@ void PPU::render_pixel() {
 
 }
 
-TileType PPU::get_pixel_tile_type(int pixel_x) {
+/**
+ * Fetch the background/window tile for this pixel_x. This will
+ * display when there is no overlapping object or if the object tile has color 0 pixels
+ */
+TileType PPU::get_fallback_tile_type(int pixel_x) {
 
-    if (((mem->get(REG_LCDC) >> LCDC_WINDOW_ENABLE_BIT) & 0b1)) {   // Window Enabled
+    uint8_t lcdc = mem->get(REG_LCDC);
+    
+    if ((lcdc >> LCDC_WINDOW_ENABLE_BIT) & 0b1) {   // Window Enabled
         uint8_t wy = mem->get(REG_WY);
         uint8_t wx = mem->get(REG_WX);
         if ((ly >= wy) && (pixel_x >= (wx - 7))) {
@@ -188,15 +261,14 @@ void PPU::fetch_pixel(int pixel_x) {
     // Static => Only re-fetch tile_data when pixel_x hits a new tile
     static std::array<uint8_t, 16> tile_data;  // Tile data is 16 bytes : 2bpp * (8x8=64 pixels)
     static uint8_t scy, scx, lcdc;
-    static std::array<uint8_t, 16> win_tile_data;
+    std::ostringstream debug_oss;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
     ly = mem->get(REG_LY);
     wx = mem->get(REG_WX);
     wy = mem->get(REG_WY);
     uint8_t color_palette = mem->get(REG_BGP);
 
-    uint16_t tile_data_base_addr;
-    bool lcdc_4, lcdc_5;
+    uint16_t tile_data_base_addr = 0;
 
     DBG( "      pxl_x = " << std::dec << pixel_x << "; ");
 
@@ -211,29 +283,23 @@ void PPU::fetch_pixel(int pixel_x) {
     bool fetching_new_tile = false;
 
 
-    static TileType prev_pxl_tile_type = TileType::UNASSIGNED;
     TileType curr_pxl_tile_type;
 
-    curr_pxl_tile_type = get_pixel_tile_type(pixel_x);
+    curr_pxl_tile_type = get_fallback_tile_type(pixel_x);
 
     lcdc = mem->get(REG_LCDC);
 
-    // bool fetch_new_tile = ((curr_pxl_tile_type != prev_pxl_tile_type) || 
-    //                         ((curr_pxl_tile_type == TileType::BACKGROUND) && ((pixel_x + scx) % 8 == 0)) ||
-    //                         ((curr_pxl_tile_type == TileType::WINDOW) && ((pixel_x - (wx-7)) % 8 == 0)));
-
-        // Condition for fetching a new tile
-
-
-        // 0 1 2 3 4 5 6 7 8 9 10 11
-        // b b b w w w w w w w w          => WX = 10. boundary is at 3, 11. 
-        // b b b b b b . . . . .  .       => SCX = 2. boundary is at 6. pixel_x = 6 + scx should hit multiples of 8
+    // Condition for fetching a new tile
+    // 0 1 2 3 4 5 6 7 8 9 10 11
+    // b b b w w w w w w w w          => e.g. WX = 10. boundary is at 3, 11. 
+    // b b b b b b . . . . .  .       => e.g. SCX = 2. boundary is at 6. pixel_x = 6 + scx should hit multiples of 8
 
     uint16_t tile_id_addr;    
 
     if (curr_pxl_tile_type == TileType::BACKGROUND){
         if (((pixel_x + scx) % 8 == 0)) {
-            DBG( "         BG" << std::endl);
+            debug_oss << "         BG" << std::endl;
+
             // Fetch background tile
 
             // The scroll registers are re-read on each tile fetch
@@ -255,10 +321,14 @@ void PPU::fetch_pixel(int pixel_x) {
         }
     } else if (curr_pxl_tile_type == TileType::WINDOW) {
         if ((pixel_x - (wx-7)) % 8 == 0) {
-            DBG( "         WIN" << std::endl);
+            debug_oss << "         WIN" << std::endl;
 
-            uint16_t tile_id_base_addr = 0x9C00;
-            // FIXME: This should respond to LCDC.6 — Window tile map area
+            uint16_t tile_id_base_addr;
+            if (((lcdc >> LCDC_WINDOW_TILEMAP_BIT) & 0x01) == 0) {
+                tile_id_base_addr = 0x9800;
+            } else {
+                tile_id_base_addr = 0x9C00;
+            }
 
             int tile_ofst_x = (pixel_x / 8);
             int tile_ofst_y = (ly / 8);
@@ -269,6 +339,8 @@ void PPU::fetch_pixel(int pixel_x) {
         }
     }
 
+    // Background and Window use the same tile maps array. They only differ in which
+    // tiles they reference (tile_id)
     if (fetching_new_tile) {
         int tile_id;
 
@@ -290,36 +362,117 @@ void PPU::fetch_pixel(int pixel_x) {
             tile_data[i] = mem->get(tile_data_addr + i);
         }
 
-        std::string debug_str = "";
+        // std::string tile_data_str = "";
+        debug_oss << "         Tile_data = ";
         for (int i = 0; i < 16; i++) {
-            char buf[4];
-            sprintf(buf, "%02X ", tile_data[i]);
-            debug_str += buf;
+            debug_oss << std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ";
         }
-        DBG( "         Tile_data = " << debug_str << std::endl);
+        debug_oss << std::endl;
     } else {
-        DBG( std::endl);
+        debug_oss << std::endl;
     }
 
-    prev_pxl_tile_type = curr_pxl_tile_type;
 
+    std::ostringstream obj_debug_oss;
+    obj_debug_oss << "         OBJ\n";
+    int obj_color_id = get_object_color_id(pixel_x, obj_debug_oss);
 
-    // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
-    int tile_local_y = (scy + ly) % 8;      // which row of the current tile does this pixel lie in?
-    uint8_t lsb_byte = tile_data[2*tile_local_y];
-    uint8_t msb_byte = tile_data[2*tile_local_y + 1];
+    int color_id;
+    if (obj_color_id != 0) {
 
-    int tile_local_x = (scx + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
-    int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
-    int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
-    int color_id = color_id_lsb + (color_id_msb << 1);
+        // ---------------------- Display Object Pixel ---------------------
+        color_id = obj_color_id;
+
+        DBG(obj_debug_oss.str());
+    } else {
+
+        // ---------------------- Display BG/WIN Pixel ---------------------
+
+        // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
+        int tile_local_y = (scy + ly) % 8;      // which row of the current tile does this pixel lie in?
+        uint8_t lsb_byte = tile_data[2*tile_local_y];
+        uint8_t msb_byte = tile_data[2*tile_local_y + 1];
+
+        int tile_local_x = (scx + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
+        int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
+        int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
+        color_id = color_id_lsb + (color_id_msb << 1);
+
+        DBG(debug_oss.str());
+    }
 
     Pixel pxl;
     pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
     pxl.valid = true;
 
-    pixel_fifo.push(pxl);
+    pixels.push(pxl);
 
+}
+
+/**
+ * Checks if the current scanline and X coordinate is covered by an object. If it is not
+ * OR if the pixel corresponds to a transparent object pixel then color_id = 0 is returned.
+ * Caller function fetch_pixel will display the fallback (BG/WIN) pixel behind.
+ */
+int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss) {
+    uint8_t lcdc = mem->get(REG_LCDC);
+
+
+
+    if ((lcdc >> LCDC_OBJ_ENABLE_BIT) & 0b1) {
+
+        Object obj;
+        
+        bool found_object = false;
+        obj_debug_oss << "         objects.size = " << objects.size << std::endl;
+        for (int i = 0; i < OBJ_FIFO_DEPTH; i++) {
+            obj = objects.fifo[i];
+
+            if ((pixel_x >= (obj.x_pos - 8)) && (pixel_x < obj.x_pos)) {
+                found_object = true;
+                obj_debug_oss << "         found objects.fifo[" << i << "]" << std::endl;
+                break;
+            }
+        }
+
+        if (found_object == false) return 0;
+
+
+        uint16_t tile_data_base_addr = 0x8000;
+        int tile_id = obj.tile_index;
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+
+        std::array<uint8_t, 16> tile_data;
+        for (int i = 0; i < 16; i++) {
+            // Populating each byte of tile data
+            tile_data[i] = mem->get(tile_data_addr + i);
+        }
+
+        obj_debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
+        obj_debug_oss << "         Tile_data = ";
+        for (int i = 0; i < 16; i++) {
+            obj_debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " ";
+        }
+        obj_debug_oss << std::endl;
+
+
+        // Where in the tile is this current (x,y)?
+        int tile_local_y = (ly % 8);    // Objects are unaffected by SCX/SCY like 
+        uint8_t lsb_byte = tile_data[2*tile_local_y];
+        uint8_t msb_byte = tile_data[2*tile_local_y + 1];
+
+        int tile_local_x = (pixel_x % 8);
+        int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
+        int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
+        int color_id = color_id_lsb + (color_id_msb << 1);
+
+        obj_debug_oss << "         Object color_id = " << color_id << std::endl;
+        return color_id;
+    } else {
+        DBG ("         Objects are disabled; lcdc = 0x" << std::hex << static_cast<int>(lcdc) << std::endl);
+    }
+
+    return 0;
 }
 
 
@@ -372,7 +525,7 @@ void PPU::ppu_tick(int mcycles){
                     // // -------------------------- REMOVE -------
                 }
                 if (dot_cnt == 80) {    // Note - 80 might be off by 1..
-                    DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt);
+                    DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl);
                     this->mode = PPUMode::DRAW_PIXELS;
                     // Loop through OAM memory and populate first 10 objects
                     // that are visible on this scanline (Y coord)
@@ -410,6 +563,7 @@ void PPU::ppu_tick(int mcycles){
                     mem->set(REG_LY, new_LY, 1);
 
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
+                    objects.clear_fifo();
                     if (new_LY == 144) {
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::VBLANK;

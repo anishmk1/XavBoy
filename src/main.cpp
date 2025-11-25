@@ -35,13 +35,14 @@ CPU *cpu;
 std::ofstream logFile;
 std::ofstream debug_file;
 std::ofstream pixel_map;
+std::string rom_path;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
 bool PRINT_REGS_EN = true;
 bool CPU_ONLY = false;
+bool SKIP_BOOT_ROM = false;         // default: false; Ninentdo logo boot rom runs by default on startup
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
-const bool SKIP_BOOT_ROM = false;   // default: false; Boot ROM execution is now enabled by default
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
 // const double GAMEBOY_CPU_FREQ_HZ = 4194304.0; // 4.194304 MHz
@@ -161,7 +162,8 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_bands_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
-    rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
+    // rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
+    rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------
@@ -175,13 +177,7 @@ int emulate(int argc, char* argv[]) {
     //      wlalink -S -v ../gb-test-roms/cpu_instrs/source/linkfile cpu_instrs_2_debug.gb
     
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--step") == 0) {
-            DEBUGGER = true;
-        } else if (strcmp(argv[i], "--quiet") == 0) {
-            PRINT_REGS_EN = false;
-        } else if (strcmp(argv[i], "--cpu_only") == 0) {
-            CPU_ONLY = true;
-        } else if (argv[i][0] != '-') {
+        if (argv[i][0] != '-') {
             rom_path = std::string(argv[i]);
         }
     }
@@ -329,8 +325,18 @@ int main(int argc, char* argv[]) {
     pixel_map.open("logs/pixel_map.log");
 #endif
 
-    // FIXME: Confirm that this automatically frees memory when program finishes
-    // use valgrind etc
+    for (int i = 1; i < argc; ++i) {
+        if (strcmp(argv[i], "--step") == 0) {
+            DEBUGGER = true;
+        } else if (strcmp(argv[i], "--quiet") == 0) {
+            PRINT_REGS_EN = false;
+        } else if (strcmp(argv[i], "--cpu_only") == 0) {
+            CPU_ONLY = true;
+        } else if (strcmp(argv[i], "--skip-boot-rom") == 0) {
+            SKIP_BOOT_ROM = true;
+        }
+    }
+
     mem         = new Memory();     // FIXME: Change "mem" reference to "mmu". Then memory field can be renamed back to "mem"
     mmio        = new MMIO();
     cpu         = new CPU();

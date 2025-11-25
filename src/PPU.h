@@ -4,7 +4,8 @@
 
 #include <array>
 
-#define FIFO_DEPTH 16
+#define PXL_FIFO_DEPTH 16
+#define OBJ_FIFO_DEPTH 10
 
 enum class Color : uint8_t {
     WHITE       = 0,
@@ -42,37 +43,53 @@ typedef struct {
     bool valid;
 } Pixel;
 
+typedef struct {
+    uint8_t x_pos;
+    uint8_t y_pos;
+    uint8_t tile_index;
+    bool priority;
+    bool y_flip;
+    bool x_flip;
+    bool dmg_palette;   // 0 = OBP0, 1 = OBP1
+    // bool bank;
+    // bool cgb_palette;
+} Object;
 
+
+template <typename T, int DEPTH>
 class FIFO {
 public:
-    Pixel pixels[FIFO_DEPTH];   // -----> [0 1 2 ... 15] ----->
+    T fifo[DEPTH];   // -----> [0 1 2 ... 15] ----->
     int size = 0;
 
-    bool push(Pixel pxl);
-    bool pop(Pixel& pxl);
+    bool push(T el);
+    bool pop(T& el);
     void print_contents();
+    void clear_fifo();
 };
 
 class PPU {
     uint8_t ly;
     uint8_t wx;
     uint8_t wy;
-    FIFO pixel_fifo;
 
-    TileType get_pixel_tile_type(int pixel_x);
-    // void fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
+    int obj_i;
+    FIFO<Pixel, PXL_FIFO_DEPTH> pixels;
+    FIFO<Object, OBJ_FIFO_DEPTH> objects;
+
+    TileType get_fallback_tile_type(int pixel_x);
 
 public:
-    PPUMode mode;   // 0 - HBLANK; 1 - VBLANK; 2 - OAM SCAN; 3 - DRAW PIXELS
+    PPUMode mode;
     void ppu_tick(int mcycles);
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);
     void draw_pixels();
     void oam_scan();
     void fetch_pixel(int pixel_x);
     void render_pixel();
+    int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss);
 
     PPU();
-    void test_ppu();
 };
 
 #endif
