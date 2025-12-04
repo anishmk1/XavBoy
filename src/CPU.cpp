@@ -337,7 +337,7 @@
             compute_flags_add8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
             rf.set(reg_idx, rf.get(reg_idx) + 1);
 
-            mcycles = 1;
+            mcycles = (reg_idx == hl) ? 3 : 1;
             print(" incrementing reg %s\n", RegFile::get_reg_name(reg_idx));
             // print(" incrementing reg %s\n", RegFile::get_reg_name(reg_bits, USE_R8_INDEX).c_str());
         } else if (match(cmd, "00xxx101")) {                // dec r8
@@ -345,9 +345,9 @@
             int reg_bits = ((cmd >> 3) & 0b111);
             r8_index_t reg_idx = RegFile::get_r8(reg_bits);
             compute_flags_sub8(rf.get(reg_idx), 1, ExcludeFlags{.no_c = true});
-            rf.set(reg_idx, rf.get(reg_idx) - 1); 
+            rf.set(reg_idx, rf.get(reg_idx) - 1);
 
-            mcycles = 1;
+            mcycles = (reg_idx == hl) ? 3 : 1;
             print(" decrementing reg %s\n", RegFile::get_reg_name(reg_idx));
 
         } else if (match(cmd, "00xxx110")) {                // ld r8, imm8
@@ -358,7 +358,7 @@
             rf.set(r8, imm8);
 
             rf.regs[PC].val++;
-            mcycles = 2;
+            mcycles = (r8 == hl) ? 3 : 2;
             print (" r[%s] <= 0x%0x\n", RegFile::get_reg_name(r8), rf.get(r8));
         } else if (match(cmd, "00000111")) {                // rlca
             print("    detected: rlca --- ");
@@ -491,6 +491,7 @@
                 print ("    detected: HALT");
                 // HALT => Wait for interrupt (clks keep running)
                 this->halt_mode = true;
+                mcycles = 1;
             } else {
                 print("    detected: ld r8, r8 ----");
                 int regd_bits = ((cmd >> 3) & 0b111);
@@ -498,8 +499,8 @@
                 r8_index_t reg_d = RegFile::get_r8(regd_bits); //RegFile::get_r16(regd_bits, USE_R8_INDEX);
                 r8_index_t reg_s = RegFile::get_r8(regs_bits); //RegFile::get_r16(regs_bits, USE_R8_INDEX);
                 rf.set(reg_d, rf.get(reg_s));
+                mcycles = (reg_d == hl || reg_s == hl) ? 2 : 1;
             }
-                mcycles = 1;
         }
         
         /////////////////////////////////
@@ -723,6 +724,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = msb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00001xxx")) {  // rrc r8
                 print("    detected: rrc r8\n");
                 uint8_t val = rf.get(r8);
@@ -733,6 +735,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = lsb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00010xxx")) {  // rl r8
                 print("    detected: rl r8\n");
                 uint8_t val = rf.get(r8);
@@ -743,6 +746,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = msb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00011xxx")) {  // rr r8
                 print("    detected: rr r8\n");
                 uint8_t val = rf.get(r8);
@@ -753,6 +757,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = lsb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00100xxx")) {  // sla r8
                 print("    detected: sla r8\n");
                 uint8_t val = rf.get(r8);
@@ -763,6 +768,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = msb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00101xxx")) {  // sra r8
                 print("    detected: sra r8\n");
                 uint8_t val = rf.get(r8);
@@ -774,6 +780,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = lsb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00110xxx")) {  // swap r8
                 print("    detected: swap r8\n");
                 uint8_t val = rf.get(r8);
@@ -783,6 +790,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = 0;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "00111xxx")) {  // srl r8
                 print("    detected: srl r8\n");
                 uint8_t val = rf.get(r8);
@@ -793,6 +801,7 @@
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 0;
                 rf.regs[AF].flags.c = lsb;
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "01xxxxxx")) {  // bit b3, r8
                 int b3 = (cb_op >> 3) & 0b111;
                 print("    detected: bit %d, r8\n", b3);
@@ -800,18 +809,21 @@
                 rf.regs[AF].flags.z = ((val & (1 << b3)) == 0);
                 rf.regs[AF].flags.n = 0;
                 rf.regs[AF].flags.h = 1;
+                mcycles = (r8 == hl) ? 3 : 2;
             } else if (match(cb_op, "10xxxxxx")) {  // res b3, r8
                 int b3 = (cb_op >> 3) & 0b111;
                 print("    detected: res %d, r8\n", b3);
                 uint8_t val = rf.get(r8);
                 val &= ~(1 << b3);
                 rf.set(r8, val);
+                mcycles = (r8 == hl) ? 4 : 2;
             } else if (match(cb_op, "11xxxxxx")) {  // set b3, r8
                 int b3 = (cb_op >> 3) & 0b111;
                 print("    detected: set %d, r8\n", b3);
                 uint8_t val = rf.get(r8);
                 val |= (1 << b3);
                 rf.set(r8, val);
+                mcycles = (r8 == hl) ? 4 : 2;
             } else {
                 printx("    default case in cb: 0x%02x\n", cb_op);
             }
@@ -821,6 +833,7 @@
             print ("    detected: ldh [c], a\n");
 
             mem->set(0xff00 + rf.get(C), rf.get(A));
+            mcycles = 2;
         } else if (match(cmd, "11100000")) {                // ldh imm8, a
             print ("    detected: ldh imm8, a ---");
 
@@ -828,6 +841,7 @@
             rf.regs[PC].val += 1;
             uint16_t addr = 0xff00 + imm8;
             mem->set(addr, rf.get(A));
+            mcycles = 3;
             print (" mem[0x%0x] <= A(0x%0x)\n", addr, rf.get(A));
         } else if (match(cmd, "11101010")) {                // ld [imm16], a
             print ("    detected: ld [imm16], a\n");
@@ -835,22 +849,26 @@
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
             rf.regs[PC].val += 2;
             mem->set(imm16, rf.get(A));
+            mcycles = 4;
         } else if (match(cmd, "11110010")) {                // ldh a, [c]
             print ("    detected: ldh a, [c]\n");
 
             rf.set(A, mem->get(0xff00 + rf.get(C)));
+            mcycles = 2;
         } else if (match(cmd, "11110000")) {                // ldh a, [imm8]
             print ("    detected: ldh a, [imm8]\n");
 
             uint8_t imm8 = mem->get(rf.get(PC));
             rf.regs[PC].val++;
             rf.set(A, mem->get(0xff00 + imm8));
+            mcycles = 3;
         } else if (match(cmd, "11111010")) {                // ld a, [imm16]
             print ("    detected: ld a, [imm16]\n");
 
             uint16_t imm16 = (mem->get(rf.regs[PC].val + 1) << 8) + mem->get(rf.regs[PC].val);      // little endian imm16
             rf.regs[PC].val += 2;
             rf.set(A, mem->get(imm16));     // NOTE: this corresponds to LD A,[n16] of rgbds gb docs. There's no guard for addr (ff00 -> ffff) like in the ldh instrs
+            mcycles = 4;
         } else if (match(cmd, "11101000")) {                // add sp, imm8
             print ("    detected: add sp, imm8\n");
 
@@ -862,6 +880,7 @@
             rf.regs[AF].flags.z = 0;
 
             rf.set(SP, rf.get(SP) + imm8);
+            mcycles = 4;
         } else if (match(cmd, "11111000")) {                // ld hl, sp + imm8
             print ("    detected: ld hl, sp + imm8\n");
 
@@ -873,18 +892,22 @@
             rf.regs[AF].flags.z = 0;
 
             rf.set(HL, rf.get(SP) + imm8);
+            mcycles = 3;
         } else if (match(cmd, "11111001")) {                // ld sp, hl
             print ("    detected: ld sp, hl\n");
             
             rf.set(SP, rf.get(HL));
+            mcycles = 2;
         } else if (match(cmd, "11110011")) {                // di
             print ("    detected: di\n");
 
             mmio->clear_ime();
+            mcycles = 1;
         } else if (match(cmd, "11111011")) {                // ei
             print ("    detected: ei\n");
 
             mmio->set_ime();
+            mcycles = 1;
         } 
 
         else {
@@ -990,7 +1013,7 @@
             r8_index_t r8 = RegFile::get_r8(reg_bits);
             operand = rf.get(r8);
             imm_or_reg = false;
-            mcycles = 1;
+            mcycles = (r8 == hl) ? 2 : 1;
         }
 
         return imm_or_reg;
