@@ -35,6 +35,7 @@ CPU *cpu;
 std::ofstream logFile;
 std::ofstream debug_file;
 std::ofstream pixel_map;
+std::ofstream serialFile;
 std::string rom_path;
 bool verbose = false;
 bool disable_prints = true;
@@ -81,10 +82,8 @@ uint8_t *open_rom(const char* file_path, size_t *file_size) {
 }
 
 void setup_serial_output() {
-    logFile.open("./logs/log.txt");
-    std::clog.rdbuf(logFile.rdbuf());  // Redirect clog to file
-
-    std::clog << "Serial Output Window....\n\n";
+    serialFile.open("./logs/serial.out");
+    serialFile << "Serial Output Window....\n\n";
 }
 
 // Poll for events
@@ -150,6 +149,8 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb";
     // rom_path = "test-roms/test.gb";
 
+    rom_path = "test-roms/gb-test-roms/instr_timing/instr_timing.gb";
+
     // ----------------------------------- DEBUG ROMS -----------------------------------------------
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb";
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_2_debug.gb";
@@ -163,8 +164,10 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_columns_scroll.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
-    rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
+    // rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
+
+    // rom_path = "test-roms/gb-test-roms/oam_bug/rom_singles/1-lcd_sync.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------
     // rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
@@ -318,7 +321,7 @@ int main(int argc, char* argv[]) {
     // also catch Ctrl+C for consistency
     std::signal(SIGINT, handle_sigterm);
 
-    // setup_serial_output();
+    setup_serial_output();
     // Separate debug log file
 #ifdef DEBUG_MODE
     debug_file.open("logs/debug.log");

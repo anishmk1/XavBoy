@@ -92,16 +92,19 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     // ------------------- WRITES ------------------
 
         if (addr == REG_LCDC) {
-            // if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
-            //     ((val & LCDC_ENABLE_BIT) == 0) &&
-            //     (this->mode != PPUMode::VBLANK)) {
-            //         std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
-            //         std::exit(EXIT_FAILURE);
-            // }
-            if (this->mode != PPUMode::VBLANK) {
-                std::cerr << "FATAL ERROR: Modifying LCD outside of VBLANK period is prohibited" << std::endl;
-                std::exit(EXIT_FAILURE);
+            DBG("Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val) << std::endl);
+
+            if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
+                ((val & LCDC_ENABLE_BIT) == 0) &&
+                (this->mode != PPUMode::VBLANK)) {
+                    std::cerr << "FATAL ERROR: Disabling LCD outside of VBLANK period is prohibited" << std::endl;
+                    std::exit(EXIT_FAILURE);
             }
+            // FIXME: Be cautious when changing object size mid-frame
+            // if (this->mode != PPUMode::VBLANK) {
+            //     std::cerr << "FATAL ERROR: Modifying LCD outside of VBLANK period is prohibited" << std::endl;
+            //     std::exit(EXIT_FAILURE);
+            // }
         } else if (addr == REG_STAT) {
             // Keep Read-Only bits [2:0] unchanged 
             uint8_t curr_ro_value = mem->get(REG_STAT) & 0b00000111;
@@ -119,10 +122,6 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
             }
         }
 
-        if (addr == REG_LCDC) {
-            DBG("Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val) 
-                        << " @ mcycle = " << dbg->mcycle_cnt << std::endl);
-        }
 
         mem->memory[addr] = val;
         return 0;
@@ -255,15 +254,20 @@ TileType PPU::get_fallback_tile_type(int pixel_x) {
 
     uint8_t lcdc = mem->get(REG_LCDC);
 
-    if ((lcdc >> LCDC_WINDOW_ENABLE_BIT) & 0b1) {   // Window Enabled
-        uint8_t wy = mem->get(REG_WY);
-        uint8_t wx = mem->get(REG_WX);
-        if ((ly >= wy) && (pixel_x >= (wx - 7))) {
-            return TileType::WINDOW;
+    if ((lcdc >> LCDC_BG_WINDOW_ENABLE_BIT) & 0b1) {  // BG/Window Enabled
+
+        if ((lcdc >> LCDC_WINDOW_ENABLE_BIT) & 0b1) {   // Window Enabled
+            uint8_t wy = mem->get(REG_WY);
+            uint8_t wx = mem->get(REG_WX);
+            if ((ly >= wy) && (pixel_x >= (wx - 7))) {
+                return TileType::WINDOW;
+            }
         }
+
+        return TileType::BACKGROUND;
+    } else {
+        return TileType::UNASSIGNED;
     }
-    
-    return TileType::BACKGROUND;
 }
 
 
@@ -407,7 +411,7 @@ void PPU::fetch_pixel(int pixel_x) {
         uint8_t msb_byte = tile_data[2*tile_local_y + 1];
 
         int tile_local_x = (scx + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
-        int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
+        int color_id_lsb = (lsb_byte >> (7 -tile_local_x)) & 0b1;
         int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
         color_id = color_id_lsb + (color_id_msb << 1);
 
@@ -418,7 +422,13 @@ void PPU::fetch_pixel(int pixel_x) {
     }
 
     Pixel pxl;
-    pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+
+    if ((curr_pxl_tile_type == TileType::UNASSIGNED) && (obj_color_id == 0)) {
+        // When LCDC Bit 0 is cleared, both background and window become blank (white), only objects can still be displayed
+        pxl.color = Color::WHITE;
+    } else {
+        pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+    }
     pxl.valid = true;
 
     pixels.push(pxl);

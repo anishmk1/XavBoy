@@ -69,17 +69,17 @@ public:
 };
 
 class PPU {
-    uint8_t ly;
     uint8_t wx;
     uint8_t wy;
 
-    int obj_i;
     FIFO<Pixel, PXL_FIFO_DEPTH> pixels;
     FIFO<Object, OBJ_FIFO_DEPTH> objects;
 
     TileType get_fallback_tile_type(int pixel_x);
 
 public:
+    uint8_t ly;
+
     PPUMode mode;
     void ppu_tick(int mcycles);
     uint8_t reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor=0);

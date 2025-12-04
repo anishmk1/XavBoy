@@ -2,8 +2,12 @@
 #ifndef CPU_H
 #define CPU_H
 
+#include <fstream>
+
 const bool USE_R8_INDEX = true;
 const int NUM_REGS = 6;
+
+extern std::ofstream serialFile;
 
 struct ExcludeFlags {
     bool no_z = false;

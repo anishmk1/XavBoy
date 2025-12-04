@@ -163,6 +163,10 @@ void Debug::debugger_break() {
                 // prints state of regs and pc ABOUT TO BE EXECUTED
                 cpu->rf.print_regs();
                 printx ("IME = 0x%0x; halt_mode = %0d\n", mmio->IME, cpu->halt_mode);
+                if      (ppu->mode == PPUMode::DRAW_PIXELS) printx ("ppu_mode = DRAW_PIXELS; LY = %0d\n", ppu->ly);
+                else if (ppu->mode == PPUMode::OAM_SCAN) printx ("ppu_mode = OAM_SCAN; LY = %0d\n", ppu->ly);
+                else if (ppu->mode == PPUMode::HBLANK) printx ("ppu_mode = HBLANK; LY = %0d\n", ppu->ly);
+                else if (ppu->mode == PPUMode::VBLANK) printx ("ppu_mode = VBLANK; LY = %0d\n", ppu->ly);
             } else if (dbg_cmd[0] == 'm') {
                 if (dbg_cmd.size() == 5) {
                     int addr = std::stoi(dbg_cmd.substr(1), nullptr, 16);

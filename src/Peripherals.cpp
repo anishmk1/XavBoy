@@ -203,6 +203,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x48;
                     mem->memory[IF] &= ~LCD_BIT;  // Clear IF LCD/STAT Bit
                     intr_triggered = true;
+                    DBG("Triggering STAT interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & TIMER_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x50;
@@ -214,11 +215,13 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x58;
                     mem->memory[IF] &= ~SERIAL_BIT;  // Clear IF Serial Bit
                     intr_triggered = true;
+                    DBG("Triggering SERIAL interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & JOYPAD_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x60;
                     mem->memory[IF] &= ~JOYPAD_BIT;  // Clear IF Joypad Bit
                     intr_triggered = true;
+                    DBG("Triggering JOYPAD interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else {
                 }
             } else {

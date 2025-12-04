@@ -1068,9 +1068,15 @@
     void CPU::serial_output() {
         if (mem->get(0xff02) == 0x81) {
             char c = static_cast<char>(mem->get(0xff01));
-            std::clog << c;
-            // printx ("%c", c);
+            serialFile << c;
+            printx ("%c", c);
             // memory[0xff02] = 0x0;
-            mem->set(0xff02, 1);
-        }    
+            
+            mem->set(0xff02, 0);
+
+            // Request Serial interrupt
+            uint8_t req_serial_int = mem->get(REG_IF);
+            req_serial_int |= (0x01 << 3);
+            mem->set(REG_IF, req_serial_int);
+        }
     }

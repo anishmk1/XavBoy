@@ -49,7 +49,7 @@ void LCD::lcd_status_update() {
     req_stat_interrupt |= (((lcd_stat >> 2) & 0b1) && ((lcd_stat >> 6) & 0b1));                         // LYC interrupt selected    (based on STAT[6])
 
     if (req_stat_interrupt) {
-        uint8_t req_lcd_int = mem->get(REG_STAT);
+        uint8_t req_lcd_int = mem->get(REG_IF);
         req_lcd_int |= (0x01 << 1);
         mem->set(REG_IF, req_lcd_int);
     }
