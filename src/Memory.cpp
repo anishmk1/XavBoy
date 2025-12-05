@@ -146,6 +146,20 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
             }
         } else if (addr <= 0xFE9F) {          // Object attribute memory (OAM)
             // Consists of 40 entries - each 4 bytes
+            // During OAM DMA transfer, CPU cannot access OAM (returns 0xFF on read, ignores writes)
+            if (ppu->oam_dma_cycles_remaining > 0) {
+                if (read_nwr) {
+                    DBG("OAM read blocked during DMA: addr=0x" << std::hex << addr
+                        << ", cycles_remaining=" << std::dec << ppu->oam_dma_cycles_remaining << std::endl);
+                    return 0xFF;  // Read returns 0xFF during DMA
+                } else {
+                    DBG("OAM write blocked during DMA: addr=0x" << std::hex << addr
+                        << ", val=0x" << static_cast<int>(val)
+                        << ", cycles_remaining=" << std::dec << ppu->oam_dma_cycles_remaining << std::endl);
+                    return 0;  // Write is ignored during DMA
+                }
+            }
+
             if (read_nwr) return memory[addr];
             else {
                 memory[addr] = val;
@@ -175,7 +189,17 @@ const int MEMORY_SIZE = 65536; // 2^16 locations for 16-bit address bus
             // FIXME: Maybe change this so it's just all done in Memory block? Not sure the clean way to do this...
             if (addr <= 0xFF3F) {
                 return mmio->access(addr, read_nwr, val);
-            } else if (addr <= 0xFF48) {            // LCD Registers
+            } else if (addr <= 0xFF45) {            // LCD Registers (before DMA)
+                return ppu->reg_access(addr, read_nwr, val, backdoor);
+            } else if (addr == 0xFF46) {            // DMA Transfer Register
+                if (!read_nwr) {  // Write - initiate DMA transfer
+                    memory[addr] = val;
+                    ppu->oam_dma_transfer(val);
+                    return 0;
+                } else {  // Read
+                    return memory[addr];
+                }
+            } else if (addr <= 0xFF48) {            // LCD Registers (after DMA)
                 return ppu->reg_access(addr, read_nwr, val, backdoor);
             } else {
                 return mmio->access(addr, read_nwr, val);

@@ -19,6 +19,7 @@
 
 #include "main.h"
 #include "PPU.h"
+#include "CPU.h"
 
 
 template <typename T, int DEPTH>
@@ -79,6 +80,7 @@ bool FIFO<T, DEPTH>::pop(T& el) {
 
 PPU::PPU() {
     this->mode = PPUMode::VBLANK;     // PPU should start in this mode once LCD Enabled
+    this->oam_dma_cycles_remaining = 0;  // No DMA transfer in progress initially
 }
 
 
@@ -92,7 +94,8 @@ uint8_t PPU::reg_access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
     // ------------------- WRITES ------------------
 
         if (addr == REG_LCDC) {
-            DBG("Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val) << std::endl);
+            DBG("Writing to LCDC reg <= 0x" << std::hex << static_cast<int>(val)
+                << " @ PC=0x" << cpu->get_pc() << std::endl);
 
             if (((mem->memory[addr] & LCDC_ENABLE_BIT) == 1) &&
                 ((val & LCDC_ENABLE_BIT) == 0) &&
@@ -526,6 +529,7 @@ void PPU::ppu_tick(int mcycles){
 
         // Detected DOT
         dot_cnt++;
+        tick_oam_dma();  // Tick OAM DMA counter if transfer in progress
         // if (dot_cnt)
 
         uint8_t curr_LY = mem->get(REG_LY);
@@ -609,12 +613,12 @@ void PPU::ppu_tick(int mcycles){
 
             case PPUMode::VBLANK: {
                 if (dot_cnt == 1) {
-                    // How was it reaching PC 0040 earlier in the program without this?
-                    // Request VBLANK interrupt
-                    uint8_t req_vblank = mem->get(REG_IF);
-                    req_vblank |= 0x01;
-                    mem->set(REG_IF, req_vblank);
-
+                    if (curr_LY == 144) {
+                        // Request VBLANK interrupt
+                        uint8_t req_vblank = mem->get(REG_IF);
+                        req_vblank |= 0x01;
+                        mem->set(REG_IF, req_vblank);
+                    }
                 } else if (dot_cnt == 10) {
                     // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
                     if (mcycle_cnt > 10) {
@@ -644,4 +648,41 @@ void PPU::ppu_tick(int mcycles){
                 break;
         }
     }
+}
+
+
+/**
+ * Tick OAM DMA counter
+ * Called once per dot (4 M-cycles) to track DMA progress
+ */
+void PPU::tick_oam_dma() {
+    if (oam_dma_cycles_remaining > 0) {
+        oam_dma_cycles_remaining -= 4;  // 1 dot = 4 M-cycles
+        if (oam_dma_cycles_remaining <= 0) {
+            oam_dma_cycles_remaining = 0;
+            DBG("   OAM DMA transfer completed @ mcycle = " << dbg->mcycle_cnt << std::endl);
+        }
+    }
+}
+
+
+/**
+ * OAM DMA Transfer
+ * Copies 160 bytes (0xA0) from source address XX00-XX9F to OAM (0xFE00-0xFE9F)
+ * where XX is the source_page parameter
+ * Transfer takes 160 M-cycles, during which only HRAM is accessible
+ */
+void PPU::oam_dma_transfer(uint8_t source_page) {
+    uint16_t source_addr = source_page << 8;
+
+    DBG("   OAM DMA transfer initiated: copying from 0x" << std::hex << source_addr
+        << " to 0xFE00-0xFE9F @ mcycle = " << std::dec << dbg->mcycle_cnt << std::endl);
+
+    // Copy 160 bytes from source to OAM immediately
+    for (int i = 0; i < 0xA0; i++) {
+        mem->memory[0xFE00 + i] = mem->memory[source_addr + i];
+    }
+
+    // Set the counter to 160 M-cycles to block OAM access during DMA
+    oam_dma_cycles_remaining = 160;
 }

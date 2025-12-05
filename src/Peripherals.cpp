@@ -33,6 +33,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
  */
 // class MMIO {
 
+    const uint16_t JOYPAD = 0xff00;    // Joypad register -- 0xFF04
     const uint16_t DIV = 0xff04;    // Divider register -- 0xFF04
     const uint16_t TIMA = 0xff05;   // Timer counter    -- 0xFF05
     const uint16_t TMA = 0xff06;    // Timer modulo     -- 0xFF06
@@ -57,10 +58,20 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             //    WRITE ACCESS   //
             // ----------------- //
             if (addr == DIV) {
-                mem->memory[addr] = 0;  // Writing any value to DIV resets it to 0
-            } else {
-                mem->memory[addr] = val;
-            }
+                val = 0;  // Writing any value to DIV resets it to 0
+            } else if (addr == JOYPAD) {
+                // TODO:: something is missing here.. If software changes the select bits but the lower nibble is preserved,
+                // that is effectively communicating an incorrect button press state. Somehow hardware needs to know to update the
+                // lower nibble once the select bits are changed. Ideally immediately or at least before SW can possibly get another
+                // read to the reg in. The Joypad interrupts seem like they should do this but do something different instead??
+
+                uint8_t ro_bits = mem->memory[JOYPAD];
+                ro_bits &= 0b00001111;      // get current lower read only nibble value
+                val |= ro_bits;             // preserve lower nibble
+            } 
+
+            mem->memory[addr] = val;
+
             return 0;
         }
     }

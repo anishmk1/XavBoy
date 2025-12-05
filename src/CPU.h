@@ -79,6 +79,7 @@ public:
 
     CPU ();
     int execute();
+    uint16_t get_pc() { return rf.get(PC); }
 
 private:
 

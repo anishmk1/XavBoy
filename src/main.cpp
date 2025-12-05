@@ -149,7 +149,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/gb-test-roms/cpu_instrs/individual/11-op a,(hl).gb";
     // rom_path = "test-roms/test.gb";
 
-    rom_path = "test-roms/gb-test-roms/instr_timing/instr_timing.gb";
+    // rom_path = "test-roms/gb-test-roms/instr_timing/instr_timing.gb";
 
     // ----------------------------------- DEBUG ROMS -----------------------------------------------
     // rom_path = "test-roms/blarggs-debug-roms/cpu_instrs_1_debug.gb";
@@ -170,7 +170,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/gb-test-roms/oam_bug/rom_singles/1-lcd_sync.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------
-    // rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
+    rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
 
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)

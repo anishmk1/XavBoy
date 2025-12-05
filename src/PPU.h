@@ -76,9 +76,11 @@ class PPU {
     FIFO<Object, OBJ_FIFO_DEPTH> objects;
 
     TileType get_fallback_tile_type(int pixel_x);
+    void tick_oam_dma();
 
 public:
     uint8_t ly;
+    int oam_dma_cycles_remaining;  // Tracks OAM DMA transfer progress (160 M-cycles)
 
     PPUMode mode;
     void ppu_tick(int mcycles);
@@ -88,6 +90,7 @@ public:
     void fetch_pixel(int pixel_x);
     void render_pixel();
     int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss);
+    void oam_dma_transfer(uint8_t source_page);
 
     PPU();
 };
