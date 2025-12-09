@@ -47,12 +47,18 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
         reset_ime();
     }
 
+    // FIXME: implement all other read-only bits and other exception behavior
     uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val) {
         if (read_nwr) {
             // ----------------- //
             //    READ ACCESS    //
             // ----------------- //
-            return mem->memory[addr];
+            uint8_t rd_val = mem->memory[addr];
+            if (addr == JOYPAD) {
+                rd_val |= 0b11000000;  // JOYPAD[7:6] are tied to 11
+            }
+
+            return rd_val;
         } else {
             // ----------------- //
             //    WRITE ACCESS   //
@@ -134,7 +140,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                         break;
                 }
                 if (disable_prints == false) {
-                    DBG("TEST Incremented TIMA; Instr_cnt: " << dbg->instr_cnt << " mcycle_cnt: " << dbg->mcycle_cnt << std::endl);
+                    DBG("   TEST Incremented TIMA; Instr_cnt: " << dbg->instr_cnt << " mcycle_cnt: " << dbg->mcycle_cnt << std::endl);
                 }
                 // debug_file.flush();
 
@@ -208,31 +214,31 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
                     intr_handler_addr = 0x40;
                     mem->memory[IF] &= ~VBLANK_BIT;  // Clear IF VBLANK Bit
                     intr_triggered = true;
-                    DBG("Triggering VBLANK interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
+                    DBG("   Triggering VBLANK interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & LCD_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x48;
                     mem->memory[IF] &= ~LCD_BIT;  // Clear IF LCD/STAT Bit
                     intr_triggered = true;
-                    DBG("Triggering STAT interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
+                    DBG("   Triggering STAT interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & TIMER_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x50;
                     mem->memory[IF] &= ~TIMER_BIT;  // Clear IF Timer Bit
                     intr_triggered = true;
-                    DBG("Triggering TIMER interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
+                    DBG("   Triggering TIMER interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & SERIAL_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x58;
                     mem->memory[IF] &= ~SERIAL_BIT;  // Clear IF Serial Bit
                     intr_triggered = true;
-                    DBG("Triggering SERIAL interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
+                    DBG("   Triggering SERIAL interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else if (ie_and_if & JOYPAD_BIT) {
                     reset_ime();
                     intr_handler_addr = 0x60;
                     mem->memory[IF] &= ~JOYPAD_BIT;  // Clear IF Joypad Bit
                     intr_triggered = true;
-                    DBG("Triggering JOYPAD interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
+                    DBG("   Triggering JOYPAD interrupt @ clk num = " << dbg->instr_cnt << std::endl); 
                 } else {
                 }
             } else {
