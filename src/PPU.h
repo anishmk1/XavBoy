@@ -77,6 +77,7 @@ class PPU {
 
     TileType get_fallback_tile_type(int pixel_x);
     void tick_oam_dma();
+    void update_stat_mode();
 
 public:
     uint8_t ly;

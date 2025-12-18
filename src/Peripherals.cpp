@@ -47,15 +47,22 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
         reset_ime();
     }
 
-    // FIXME: implement all other read-only bits and other exception behavior
     uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val) {
         if (read_nwr) {
             // ----------------- //
             //    READ ACCESS    //
             // ----------------- //
             uint8_t rd_val = mem->memory[addr];
+
+            // Handle read-only bits for various registers
             if (addr == JOYPAD) {
-                rd_val |= 0b11000000;  // JOYPAD[7:6] are tied to 11
+                rd_val |= 0b11000000;  // JOYPAD[7:6] always read as 1
+            } else if (addr == IF) {
+                rd_val |= 0b11100000;  // IF[7:5] always read as 1
+            } else if (addr == TAC) {
+                rd_val |= 0b11111000;  // TAC[7:3] always read as 1
+            } else if (addr == 0xFF02) {  // SC - Serial Control
+                rd_val |= 0b01111110;  // SC[6:1] always read as 1 (DMG mode)
             }
 
             return rd_val;

@@ -78,9 +78,20 @@ bool FIFO<T, DEPTH>::pop(T& el) {
 }
 
 
+/**
+ * Update STAT register mode bits to reflect current PPU mode
+ * STAT bits 2-0 are read-only and must always match the current PPU mode
+ */
+void PPU::update_stat_mode() {
+    uint8_t stat = mem->memory[REG_STAT];
+    stat = (stat & 0xF8) | static_cast<uint8_t>(this->mode);
+    mem->memory[REG_STAT] = stat;
+}
+
 PPU::PPU() {
     this->mode = PPUMode::VBLANK;     // PPU should start in this mode once LCD Enabled
     this->oam_dma_cycles_remaining = 0;  // No DMA transfer in progress initially
+    update_stat_mode();  // Sync mode bits to STAT register
 }
 
 
@@ -558,10 +569,12 @@ void PPU::ppu_tick(int mcycles){
                 }
                 if (dot_cnt == 80) {    // Note - 80 might be off by 1..
                     DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] OAM_SCAN: dot_cnt == 80. Moving to DRAW_PIXELS;  @ mcycle = " << dbg->mcycle_cnt << std::endl);
-                    this->mode = PPUMode::DRAW_PIXELS;
                     // Loop through OAM memory and populate first 10 objects
                     // that are visible on this scanline (Y coord)
                     oam_scan();
+
+                    this->mode = PPUMode::DRAW_PIXELS;
+                    update_stat_mode();
                 }
                 break;
             }
@@ -585,6 +598,7 @@ void PPU::ppu_tick(int mcycles){
                     DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl);
 
                     this->mode = PPUMode::HBLANK;
+                    update_stat_mode();
                 }
                 break;
             }
@@ -606,6 +620,7 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::OAM_SCAN;
                     }
+                    update_stat_mode();
                 }
 
                 break;
@@ -633,6 +648,7 @@ void PPU::ppu_tick(int mcycles){
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] VBLANK: new_LY == 155; Moving back to scanline 1 OAM_SCAN @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
+                        update_stat_mode();
 
                         // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
                         // mem->set(0xfffa, 0);
