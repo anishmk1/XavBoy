@@ -524,8 +524,12 @@ void PPU::ppu_tick(int mcycles){
     // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #ifndef REL_MODE
     if (dbg->mcycle_cnt >= 20000000) {
-        print ("Run for enough time. Exit\n");
+        printx ("Run for enough time. Exit\n");
         DBG("Run for enough time. Exit" << std::endl);
+        std::exit(EXIT_SUCCESS);
+    } else if (dbg->frame_cnt >= 20) {
+        printx ("Run for enough time. Exit\n");
+        DBG("Run for enough time (5 Frames). Exit" << std::endl);
         std::exit(EXIT_SUCCESS);
     }
     #endif

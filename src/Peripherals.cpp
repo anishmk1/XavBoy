@@ -47,7 +47,7 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
         reset_ime();
     }
 
-    uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val) {
+    uint8_t MMIO::access(int addr, bool read_nwr, uint8_t val, bool backdoor) {
         if (read_nwr) {
             // ----------------- //
             //    READ ACCESS    //
@@ -73,14 +73,14 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             if (addr == DIV) {
                 val = 0;  // Writing any value to DIV resets it to 0
             } else if (addr == JOYPAD) {
-                // TODO:: something is missing here.. If software changes the select bits but the lower nibble is preserved,
-                // that is effectively communicating an incorrect button press state. Somehow hardware needs to know to update the
-                // lower nibble once the select bits are changed. Ideally immediately or at least before SW can possibly get another
-                // read to the reg in. The Joypad interrupts seem like they should do this but do something different instead??
 
-                uint8_t ro_bits = mem->memory[JOYPAD];
-                ro_bits &= 0b00001111;      // get current lower read only nibble value
-                val |= ro_bits;             // preserve lower nibble
+                if (!backdoor) {
+                    uint8_t ro_bits = mem->memory[JOYPAD];
+                    ro_bits &= 0b00001111;      // get current lower read only nibble value
+                    val |= ro_bits;             // preserve lower nibble
+
+                    joy->update_button_state();
+                }
             } 
 
             mem->memory[addr] = val;

@@ -23,7 +23,7 @@ public:
     // bool exit_halt_mode(uint16_t &intr_handler_addr);
     bool exit_halt_mode();
     bool check_interrupts(uint16_t &intr_handler_addr, bool cpu_halted);
-    uint8_t access(int addr, bool read_nwr, uint8_t val=0);
+    uint8_t access(int addr, bool read_nwr, uint8_t val=0, bool backdoor=false);
 
     MMIO();
     // MMIO(Memory *memory);

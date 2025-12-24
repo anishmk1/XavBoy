@@ -25,7 +25,9 @@
 #include "CPU.h"
 #include "PPU.h"
 #include "Debug.h"
+#include "Joypad.h"
 
+Joypad *joy;
 Debug *dbg;
 Memory *mem;
 PPU *ppu;
@@ -95,9 +97,46 @@ bool sdl_event_loop(bool& main_loop_running) {
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
-        if (event.type == SDL_QUIT) {
+        if (event.type == SDL_QUIT)
             main_loop_running = false; // Window closed
 
+        if (event.type == SDL_KEYDOWN && !event.key.repeat) {
+            switch (event.key.keysym.scancode) {
+                case SDL_SCANCODE_W: joy->buttons.D_UP = true; break;
+                case SDL_SCANCODE_A: joy->buttons.D_LEFT = true; break;
+                case SDL_SCANCODE_S: joy->buttons.D_DOWN = true; break;
+                case SDL_SCANCODE_D: joy->buttons.D_RIGHT = true; break;
+                default: break;
+            }
+        }
+
+        
+        if (event.type == SDL_KEYUP) {
+            switch (event.key.keysym.scancode) {
+                case SDL_SCANCODE_W: {
+                    joy->buttons.D_UP = false;
+                    DBG ("  KEYUP: D_UP" << std::endl);
+                    break;
+                }
+                case SDL_SCANCODE_A: joy->buttons.D_LEFT = false; break;
+                case SDL_SCANCODE_S: joy->buttons.D_DOWN = false; break;
+                case SDL_SCANCODE_D: joy->buttons.D_RIGHT = false; break;
+                default: break;
+            }
+        }
+
+        bool up_held = false;
+        if (joy->buttons.D_UP) {
+            // w pressed => D-pad UP button
+            SDL_Log("DPAD Up held");
+            DBG ("   DPAD Up held; joyp=0x" << std::hex << static_cast<int>(mem->get(REG_JOYP)));
+            up_held = true;
+        }
+
+        joy->update_button_state();
+
+        if (up_held == true) {
+            DBG ("; new_joyp=0x" << std::hex << static_cast<int>(mem->get(REG_JOYP)) << std::endl);
         }
     }
 
@@ -166,11 +205,12 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
+    rom_path = "test-roms/graphics-test-roms/joypad_test.gb";
 
     // rom_path = "test-roms/gb-test-roms/oam_bug/rom_singles/1-lcd_sync.gb";
 
     // ---------------------------------------- GAMES ------------------------------------------------
-    rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
+    // rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
 
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -346,6 +386,7 @@ int main(int argc, char* argv[]) {
     ppu         = new PPU();
     dbg         = new Debug();
     lcd         = new LCD();
+    joy         = new Joypad();
 
     lcd->init_screen();
      

@@ -55,6 +55,7 @@ compile:
 	@$(CXX) $(CXXFLAGS) -c src/Peripherals.cpp -o bin/Peripherals.o
 	@$(CXX) $(CXXFLAGS) -c src/Debug.cpp -o bin/Debug.o
 	@$(CXX) $(CXXFLAGS) -c src/LCD.cpp -o bin/LCD.o
+	@$(CXX) $(CXXFLAGS) -c src/Joypad.cpp -o bin/Joypad.o
 	@$(CXX) $(CXXFLAGS) -c src/main.cpp -o bin/main.o
 
 compile_release:
@@ -64,6 +65,7 @@ compile_release:
 	@$(CXX) $(CXXRELFLAGS) -c src/Peripherals.cpp -o bin/Peripherals.o
 	@$(CXX) $(CXXRELFLAGS) -c src/Debug.cpp -o bin/Debug.o
 	@$(CXX) $(CXXRELFLAGS) -c src/LCD.cpp -o bin/LCD.o
+	@$(CXX) $(CXXRELFLAGS) -c src/Joypad.cpp -o bin/Joypad.o
 	@$(CXX) $(CXXRELFLAGS) -c src/main.cpp -o bin/main.o
 
 gdb:
@@ -73,11 +75,12 @@ gdb:
 	@$(CXX) $(CXXDBGFLAGS) -c src/Peripherals.cpp -o bin/Peripherals.o
 	@$(CXX) $(CXXDBGFLAGS) -c src/Debug.cpp -o bin/Debug.o
 	@$(CXX) $(CXXDBGFLAGS) -c src/LCD.cpp -o bin/LCD.o
+	@$(CXX) $(CXXDBGFLAGS) -c src/Joypad.cpp -o bin/Joypad.o
 	@$(CXX) $(CXXDBGFLAGS) -c src/main.cpp -o bin/main.o
-	@$(CXX) $(LDDBGFLAGS) bin/main.o bin/Memory.o bin/CPU.o bin/PPU.o bin/Peripherals.o bin/Debug.o bin/LCD.o -o myprogram $(SDL_LDFLAGS)
+	@$(CXX) $(LDDBGFLAGS) bin/main.o bin/Memory.o bin/CPU.o bin/PPU.o bin/Peripherals.o bin/Debug.o bin/LCD.o bin/Joypad.o -o myprogram $(SDL_LDFLAGS)
 
 link:
-	@$(CXX) bin/main.o bin/Memory.o bin/CPU.o bin/PPU.o bin/Peripherals.o bin/Debug.o bin/LCD.o -o myprogram $(SDL_LDFLAGS)
+	@$(CXX) bin/main.o bin/Memory.o bin/CPU.o bin/PPU.o bin/Peripherals.o bin/Debug.o bin/LCD.o bin/Joypad.o -o myprogram $(SDL_LDFLAGS)
 
 test:
 	python3 cpu_instrs_sanity_test.py

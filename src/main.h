@@ -7,10 +7,12 @@
 #include "Memory.h"
 #include "Peripherals.h"
 #include "LCD.h"
+#include "Joypad.h"
 
 #include <chrono>
 #include <thread>
 
+const uint16_t REG_JOYP = 0xff00;   // P1/JOYPAD
 
 // LCD Register addresses
 const uint16_t REG_LCDC = 0xff40;   // LCD control
@@ -25,6 +27,15 @@ const uint16_t REG_WX   = 0xff4b;   // Window X position + 7
 
 const uint16_t REG_IF   = 0xff0f;   // Interrupt Flag
 const uint16_t REG_IE   = 0xffff;   // Interrupt Enable
+
+// JOYP Register fields
+constexpr int JOYP_SEL_BUTTONS_BIT           = 5;
+constexpr int JOYP_SEL_DPAD_BIT              = 4;
+constexpr int JOYP_START_DOWN_BIT            = 3;
+constexpr int JOYP_SELECT_UP_BIT             = 2;
+constexpr int JOYP_B_LEFT_BIT                = 1;
+constexpr int JOYP_A_RIGHT_BIT               = 0;
+
 
 // LCDC Register fields
 constexpr uint8_t LCDC_ENABLE_BIT            = 1 << 7;   // Bit 7
@@ -58,6 +69,7 @@ extern bool SKIP_BOOT_ROM;          // default: true; Start executing with PC at
 extern const bool LOAD_BOOT_ROM;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 extern const bool GAMEBOY_DOCTOR;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
+extern Joypad *joy;
 extern PPU *ppu;        // Globally referencable PPU module
 extern Memory *mem;      // Globally referencable Memory 
 extern MMIO *mmio;
