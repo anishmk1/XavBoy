@@ -116,12 +116,7 @@ bool sdl_event_loop(bool& main_loop_running) {
         
         if (event.type == SDL_KEYUP) {
             switch (event.key.keysym.scancode) {
-                case SDL_SCANCODE_W: {
-                    joy->buttons.D_UP = false;
-                    DBG ("  KEYUP: D_UP" << std::endl);
-                    SDL_Log("  KEYUP: D_UP");
-                    break;
-                }
+                case SDL_SCANCODE_W: joy->buttons.D_UP = false; break;
                 case SDL_SCANCODE_A: joy->buttons.D_LEFT = false; break;
                 case SDL_SCANCODE_S: joy->buttons.D_DOWN = false; break;
                 case SDL_SCANCODE_D: joy->buttons.D_RIGHT = false; break;
@@ -132,19 +127,7 @@ bool sdl_event_loop(bool& main_loop_running) {
             }
         }
 
-        bool up_held = false;
-        if (joy->buttons.D_UP) {
-            // w pressed => D-pad UP button
-            SDL_Log("DPAD Up held");
-            DBG ("   DPAD Up held; joyp=0x" << std::hex << static_cast<int>(mem->get(REG_JOYP)));
-            up_held = true;
-        }
-
         joy->update_button_state();
-
-        if (up_held == true) {
-            DBG ("; new_joyp=0x" << std::hex << static_cast<int>(mem->get(REG_JOYP)) << std::endl);
-        }
     }
 
     if (main_loop_running == false) {

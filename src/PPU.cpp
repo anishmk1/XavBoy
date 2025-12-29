@@ -617,9 +617,6 @@ void PPU::ppu_tick(int mcycles){
                     if (new_LY == 144) {
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to 1st VBLANK scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::VBLANK;
-
-                        // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
-                        // mem->set(0xfffa, 1);
                     } else {
                         DBG("   [LY = " << std::dec << static_cast<int>(curr_LY) << "] HBLANK: dot_cnt == 456. Moving to next scanline @ mcycle = " << dbg->mcycle_cnt << std::endl);
                         this->mode = PPUMode::OAM_SCAN;
@@ -653,9 +650,6 @@ void PPU::ppu_tick(int mcycles){
                         new_LY = 0;
                         this->mode = PPUMode::OAM_SCAN;
                         update_stat_mode();
-
-                        // // FIXME: Temp workaround - set 0xFFFA to 1 whenever PPU is in VBLANK mode. And clear once out of VBLANK. Software will use this to poll
-                        // mem->set(0xfffa, 0);
                     }
 
                     mem->set(REG_LY, new_LY, 1);
