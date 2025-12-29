@@ -915,7 +915,7 @@
                 0xD3, 0xDB, 0xDD, 0xE3, 0xE4, 0xEB, 0xEC, 0xED, 0xF4, 0xFC, 0xFD
             };
             if (hardlock_ops.count(cmd)) {
-                std::cerr << "Detected Hard Lock Opcode: 0x" << std::hex << cmd << std::endl;
+                std::cerr << "Detected Hard Lock Opcode: 0x" << std::hex << static_cast<int>(cmd) << " at PC = 0x" << static_cast<int>(rf.regs[PC].val) << std::endl;
                 std::exit(EXIT_FAILURE);
             }
 

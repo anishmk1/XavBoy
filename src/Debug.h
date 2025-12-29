@@ -76,6 +76,7 @@ public:
     Debug();
     void set_breakpoint(std::string msg);
     void debugger_break();
+    void check_for_breakpoints();
 
     // CSV performance logging methods
     void init_csv_logging();

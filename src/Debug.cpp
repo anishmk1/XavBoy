@@ -51,6 +51,30 @@ void parse_dbg_cmd(std::string &dbg_cmd, std::vector<std::string> &words) {
     }
 }
 
+void Debug::check_for_breakpoints() {
+
+    // NOTE: There is no reliable mem address where RGBDS allows setting 
+    // a magic number to search for. Instead, to break at a specific line of code,
+    // just add a label - .label1: above it and run rbglink --map map_file and see the
+    // PC of the label. Then jump to that pc with spc__ (in hex)    
+
+    
+    // static bool bpt3_hit = false;
+
+    // // BREAKPOINT SETTING
+    // if (mem->get(0xfffe) == 0xac) {
+    //     set_breakpoint("BPT 2: In .updateWX after storing a in RAM");
+    // // } else if (mem->get(0xfffe) == 0xab) {
+    // //     set_breakpoint("BPT 1: In VBlankHandler");
+    // } else if (mem->get(0xfffe) == 0xaa) {
+    //     set_breakpoint("BPT 0: Before VBlankHandler Label");
+    // } if ((mem->get(0xfffe) == 0xab) && !bpt3_hit) {
+    //     bpt3_hit = true;
+    //     set_breakpoint("BPT 3: ReadInput - detected UP");
+    // }
+
+}
+
 void Debug::set_breakpoint(std::string msg) {
     bp_info.breakpoint = true;
     bp_info.msg = msg;

@@ -1,9 +1,9 @@
 ; ------------------------------------------------
 ; ------------------------------------------------
-; Compile with RGBASM
+; Compile with RGBASM (v0.9.1)
 ; cd ./test-roms/graphics-test-roms
 ; rgbasm -o joypad_test.obj joypad_test.asm
-; rgblink -o joypad_test.gb joypad_test.obj
+; rgblink -o joypad_test.gb joypad_test.obj --sym symbol_file --map map_file
 ; rgbfix -v -p 0 joypad_test.gb
 ; ------------------------------------------------
 ; ------------------------------------------------
@@ -123,10 +123,15 @@ MainLoop:
 ; Wait for VBlank
 ; -------------------------------
 WaitVBlank:
-.wait:
+.wait_not_vblank:
     ld a, [rLY]
     cp 144
-    jr c, .wait
+    jr nc, .wait_not_vblank   ; wait until LY < 144
+
+.wait_vblank:
+    ld a, [rLY]
+    cp 144
+    jr c, .wait_vblank        ; wait until LY >= 144
     ret
 
 ; -------------------------------

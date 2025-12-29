@@ -106,6 +106,9 @@ bool sdl_event_loop(bool& main_loop_running) {
                 case SDL_SCANCODE_A: joy->buttons.D_LEFT = true; break;
                 case SDL_SCANCODE_S: joy->buttons.D_DOWN = true; break;
                 case SDL_SCANCODE_D: joy->buttons.D_RIGHT = true; break;
+
+                case SDL_SCANCODE_J: joy->buttons.A = true; break;
+                case SDL_SCANCODE_K: joy->buttons.B = true; break;
                 default: break;
             }
         }
@@ -116,11 +119,15 @@ bool sdl_event_loop(bool& main_loop_running) {
                 case SDL_SCANCODE_W: {
                     joy->buttons.D_UP = false;
                     DBG ("  KEYUP: D_UP" << std::endl);
+                    SDL_Log("  KEYUP: D_UP");
                     break;
                 }
                 case SDL_SCANCODE_A: joy->buttons.D_LEFT = false; break;
                 case SDL_SCANCODE_S: joy->buttons.D_DOWN = false; break;
                 case SDL_SCANCODE_D: joy->buttons.D_RIGHT = false; break;
+
+                case SDL_SCANCODE_J: joy->buttons.A = false; break;
+                case SDL_SCANCODE_K: joy->buttons.B = false; break;
                 default: break;
             }
         }
@@ -289,16 +296,7 @@ int emulate(int argc, char* argv[]) {
             // frame_timing_started = false;  // Reset for next frame
         }
 
-        // BREAKPOINT SETTING
-        if (mem->get(0xfffe) == 0xac) {
-            // dbg->bp_info.breakpoint = true;
-            // dbg->bp_info.msg = "BPT: In .updateWX after storing a in RAM";
-            dbg->set_breakpoint("BPT 2: In .updateWX after storing a in RAM");
-        } else if (mem->get(0xfffe) == 0xab) {
-            dbg->set_breakpoint("BPT 1: In VBlankHandler");
-        } else if (mem->get(0xfffe) == 0xaa) {
-            dbg->set_breakpoint("BPT 0: Before VBlankHandler Label");
-        }
+        dbg->check_for_breakpoints();
 
         // dbg->start_section_timing();
         dbg->debugger_break();
