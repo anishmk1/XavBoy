@@ -518,40 +518,48 @@ void PPU::ppu_tick(int mcycles){
     if (CPU_ONLY) return;
     if ((mem->memory[REG_LCDC] & LCDC_ENABLE_BIT) == 0) return;
 
-    static int mcycle_cnt = 0;     // initialized once, persists across calls
     static int dot_cnt    = 0;     // initialized once, persists across calls
 
-    // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // FIXME REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #ifndef REL_MODE
     if (dbg->mcycle_cnt >= 20000000) {
-        printx ("Run for enough time. Exit\n");
-        DBG("Run for enough time. Exit" << std::endl);
+        printx ("Run for enough time (mcycles). Exit\n");
+        DBG("Run for enough time (mcycles). Exit" << std::endl);
         std::exit(EXIT_SUCCESS);
     } else if (dbg->frame_cnt >= 20) {
-        printx ("Run for enough time. Exit\n");
-        DBG("Run for enough time (5 Frames). Exit" << std::endl);
+        printx ("Run for enough time (20 Frames). Exit\n");
+        DBG("Run for enough time (20 Frames). Exit" << std::endl);
         std::exit(EXIT_SUCCESS);
     }
     #endif
-    // REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // FIXME REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
     
-    mcycle_cnt += mcycles;
-    if (mcycle_cnt >= 4) {
-        // debug_file << "Detected DOT" << std::endl;
-        mcycle_cnt %= 4;
+    int num_ppu_ticks = mcycles * 4;        // "there are 4 dots per Normal Speed M-cycle"
+    for (int i = 0; i < num_ppu_ticks; i++) {
 
-        // Detected DOT
         dot_cnt++;
         tick_oam_dma();  // Tick OAM DMA counter if transfer in progress
-        // if (dot_cnt)
 
         uint8_t curr_LY = mem->get(REG_LY);
 
-        // ------------------- //
-        //  PPU state machine  //
-        // ------------------- //
+        lcd->lcd_status_update();
+        if (lcd->frame_ready) {
+            lcd->frame_buffer_populated = false;
+            lcd->frame_ready = false;
+
+            lcd->draw_frame();
+            dbg->frame_cnt++;
+            dbg->perf.num_main_loops = 0;
+
+            // Poll SDL events once per frame
+            joy->poll_sdl_events_ready = true;
+        }
+
+        // ------------------------ //
+        //     PPU state machine    //
+        // ------------------------ //
         switch (this->mode) {
             case PPUMode::OAM_SCAN: {
                 if (dot_cnt == 1) {
@@ -561,9 +569,16 @@ void PPU::ppu_tick(int mcycles){
                     wy = mem->get(REG_WY);
 
                     if (curr_LY == 0) {
+                        // double duration = std::chrono::duration<double>(Clock::now() - start_time).count();                        
+                        // start_time = Clock::now();
+
+                        // printx ("Frame %0lu duration = %.9f seconds; mcycle_cnt = %0ld\n", dbg->frame_cnt, duration, dbg->mcycle_cnt);
+
+                        // DBG("   duration = " << std::fixed << std::setprecision(9) << duration << " seconds" << std::endl << std::endl);
                         DBG("Frame: " << dbg->frame_cnt << std::endl);
                         DBG("   SCX = " << static_cast<int>(mem->get(REG_SCX)) << "; SCY = " << static_cast<int>(mem->get(REG_SCY)) << std::endl);
-                        DBG("   WX  = " << static_cast<int>(mem->get(REG_WX)) << "; WY = " << static_cast<int>(mem->get(REG_WY)) << std::endl << std::endl);
+                        DBG("   WX  = " << static_cast<int>(mem->get(REG_WX)) << "; WY = " << static_cast<int>(mem->get(REG_WY)) << std::endl);
+                        // DBG("   mcycle_cnt = " << dbg->mcycle_cnt << std::endl << std::endl );
                         // // -------------------------- REMOVE -------
                         // if (dbg->frame_cnt == 2) {
                         //     std::exit(EXIT_SUCCESS);
@@ -636,9 +651,9 @@ void PPU::ppu_tick(int mcycles){
                         mem->set(REG_IF, req_vblank);
                     }
                 } else if (dot_cnt == 10) {
-                    // Finished fetching all the pixel data and framebuffer is populated- this is when screen actually refreshes in hardware. So it's the right time to 
-                    if (mcycle_cnt > 10) {
-                        // make sure it's not VBLANK out of init
+                    // Frame buffer is populated in the last scanline's DRAW_PIXELS phase
+                    // Delay frame_ready signal (for drawing to screen) until slightly into VBLANK phase to emulate real hardware
+                    if (lcd->frame_buffer_populated) {
                         lcd->frame_ready = true;
                     }
                 } else if (dot_cnt == 456) {

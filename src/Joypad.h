@@ -30,6 +30,8 @@ class Joypad {
 private:
 
 public:
+    bool poll_sdl_events_ready = false;
+
     struct KeyMatrix keys {};
     struct ButtonMatrix buttons {};
 

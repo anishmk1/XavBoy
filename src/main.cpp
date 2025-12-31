@@ -39,6 +39,7 @@ std::ofstream debug_file;
 std::ofstream pixel_map;
 std::ofstream serialFile;
 std::string rom_path;
+Clock::time_point start_time;
 bool verbose = false;
 bool disable_prints = true;
 bool DEBUGGER = false;
@@ -259,24 +260,13 @@ int emulate(int argc, char* argv[]) {
 
         dbg->perf.num_main_loops++;
 
-        lcd->lcd_status_update();
-        if (lcd->frame_ready) {
-            // Poll SDL events once per frame for better WSL2 performance
-            // dbg->start_section_timing();
+        // Poll SDL events once per frame - set in ppu_tick
+        if (joy->poll_sdl_events_ready) {
             if (sdl_event_loop(main_loop_running) == true) {
                 return 0;
             }
-            // dbg->end_section_timing("sdl_events");
 
-            // dbg->start_section_timing();
-            lcd->draw_frame();
-            dbg->frame_cnt++;
-            dbg->perf.num_main_loops = 0;
-            // dbg->end_section_timing("lcd");
-
-            // Finalize frame timing and write to CSV
-            // dbg->finalize_frame_timing();
-            // frame_timing_started = false;  // Reset for next frame
+            joy->poll_sdl_events_ready = false;
         }
 
         dbg->check_for_breakpoints();
@@ -371,6 +361,8 @@ int main(int argc, char* argv[]) {
 
     lcd->init_screen();
      
+    start_time  = Clock::now();
+
     emulate(argc, argv);
 
     lcd->close_window();

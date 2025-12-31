@@ -12,6 +12,8 @@
 #include <chrono>
 #include <thread>
 
+using Clock = std::chrono::steady_clock;
+
 const uint16_t REG_JOYP = 0xff00;   // P1/JOYPAD
 
 // LCD Register addresses
@@ -47,6 +49,9 @@ constexpr uint8_t LCDC_OBJ_SIZE_BIT          = 2;   // Bit 2
 constexpr uint8_t LCDC_OBJ_ENABLE_BIT        = 1;   // Bit 1
 constexpr uint8_t LCDC_BG_WINDOW_ENABLE_BIT  = 0;   // Bit 0   BG & Window enable / priority
 
+constexpr double    GB_CPU_HZ       = 4194304.0;
+constexpr uint64_t  CYCLES_PER_FRAME = 70224;
+
 
 enum ObjDataFormat : uint8_t {
     OBJ_Y_POS       = 0,
@@ -56,6 +61,7 @@ enum ObjDataFormat : uint8_t {
 };
 
 
+extern Clock::time_point start_time;
 extern std::string rom_path;
 extern std::ofstream logFile;
 extern std::ofstream debug_file;

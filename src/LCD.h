@@ -28,7 +28,8 @@ public:
     SDL_Window* window      = nullptr;
     SDL_Texture* texture    = nullptr;
     SDL_Renderer* renderer  = nullptr;
-    bool frame_ready;
+    bool frame_buffer_populated = false;
+    bool frame_ready        = false;
 
     void init_screen();
     void close_window();

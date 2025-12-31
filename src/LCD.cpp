@@ -88,7 +88,7 @@ void LCD::write_to_framebuffer(Pixel& pxl) {
         if (framebuffer_write_ptr_y == (SCREEN_HEIGHT-1)) {
             // Reached end of frame - ready to display
             framebuffer_write_ptr_y = 0;
-            this->frame_ready = true;
+            this->frame_buffer_populated = true;
         } else {
             // Frame not finished - move to the next scanline
             framebuffer_write_ptr_y++;
@@ -168,7 +168,6 @@ void LCD::log_framebuffer() {
 
 void LCD::draw_frame() {
     if (CPU_ONLY) return;
-    this->frame_ready = false;
 
     #ifndef REL_MODE
     lcd->log_framebuffer();
