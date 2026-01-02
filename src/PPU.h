@@ -90,7 +90,7 @@ public:
     void oam_scan();
     void fetch_pixel(int pixel_x);
     void render_pixel();
-    int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss);
+    int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss, Object& obj);
     void oam_dma_transfer(uint8_t source_page);
 
     PPU();

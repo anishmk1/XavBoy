@@ -285,6 +285,9 @@ TileType PPU::get_fallback_tile_type(int pixel_x) {
 }
 
 
+// FIXME: [p3] This whole fetch pixel function is kind of messy. I dont like the calculation of fallback pixel type
+// and then getting the relevant data for that (between BG/WIN) and then also computing object (in another function..)
+// and then seeing if it falls through based on the color = 0.. Find a way to rewrite this
 /**
  * Given a pixel x coordinate on the screen - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
  */
@@ -296,7 +299,6 @@ void PPU::fetch_pixel(int pixel_x) {
     static uint8_t scy, scx, lcdc;
     std::ostringstream debug_oss;
     // 32 = number of tiles along X (32x32 tile indices in the VRAM Tile map)
-    uint8_t color_palette = mem->get(REG_BGP);
 
     uint16_t tile_data_base_addr = 0;
 
@@ -406,13 +408,15 @@ void PPU::fetch_pixel(int pixel_x) {
 
     std::ostringstream obj_debug_oss;
     obj_debug_oss << "         OBJ\n";
-    int obj_color_id = get_object_color_id(pixel_x, obj_debug_oss);
+    Object obj;
+    int obj_color_id = get_object_color_id(pixel_x, obj_debug_oss, obj);
 
     int color_id;
     if (obj_color_id != 0) {
 
         // ---------------------- Display Object Pixel ---------------------
         color_id = obj_color_id;
+        curr_pxl_tile_type = TileType::OBJECT;
 
         DBG(obj_debug_oss.str());
     } else {
@@ -435,12 +439,25 @@ void PPU::fetch_pixel(int pixel_x) {
         // DBG(obj_debug_oss.str());
     }
 
-    Pixel pxl;
-
+    // ------------------------------------------------- //
+    //              Get the Final Pixel Color            //
+    // ------------------------------------------------- //
+    Pixel pxl {};
     if ((curr_pxl_tile_type == TileType::UNASSIGNED) && (obj_color_id == 0)) {
         // When LCDC Bit 0 is cleared, both background and window become blank (white), only objects can still be displayed
         pxl.color = Color::WHITE;
-    } else {
+
+    } else if ((curr_pxl_tile_type == TileType::BACKGROUND) || (curr_pxl_tile_type == TileType::WINDOW)) {
+
+        uint8_t color_palette;
+
+        color_palette = mem->get(REG_BGP);
+        pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+
+    } else if (curr_pxl_tile_type == TileType::OBJECT) {
+        uint8_t color_palette;
+
+        color_palette = mem->get(REG_OBP0 + obj.dmg_palette);
         pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
     }
     pxl.valid = true;
@@ -454,14 +471,14 @@ void PPU::fetch_pixel(int pixel_x) {
  * OR if it is and the pixel corresponds to a transparent object pixel then color_id = 0 is returned.
  * Caller function fetch_pixel will display the fallback (BG/WIN) pixel behind.
  */
-int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss) {
+int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss, Object& obj) {
     uint8_t lcdc = mem->get(REG_LCDC);
 
 
 
     if ((lcdc >> LCDC_OBJ_ENABLE_BIT) & 0b1) {
 
-        Object obj;
+        // Object obj;
         
         bool found_object = false;
         obj_debug_oss << "         objects.size = " << objects.size << std::endl;

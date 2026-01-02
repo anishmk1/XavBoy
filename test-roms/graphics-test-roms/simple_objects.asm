@@ -32,10 +32,18 @@ Start:
     ;-------------------------------;
     ;    Write Tile Data to VRAM    ;
     ;-------------------------------;
-    
-    ; Initialize palette (all 4 shades)
+
+    ; Initialize Background Palette (all 4 shades)
     ld a, %11100100   ; 00=white, 01=light gray, 10=dark gray, 11=black
-    ldh [$ff47], a       ; rBGP <= a
+    ldh [$ff47], a    ; rBGP <= a (Background Palette)
+
+    ; Initialize Object Palette 0 (for sprites)
+    ; Objects/sprites use separate palette registers (OBP0 and OBP1)
+    ; The OAM attribute byte (byte 3) bit 4 selects which palette:
+    ;   Bit 4 = 0 → Use OBP0 ($FF48)
+    ;   Bit 4 = 1 → Use OBP1 ($FF49)
+    ld a, %11100100   ; Same palette mapping for objects
+    ldh [$ff48], a    ; rOBP0 <= a (Object Palette 0)
 
 
     ; First Define 4 tiles - all white to all black 8x8 grid of pixels

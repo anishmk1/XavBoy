@@ -195,8 +195,9 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
+    rom_path = "test-roms/graphics-test-roms/complex_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
-    rom_path = "test-roms/graphics-test-roms/joypad_test.gb";
+    // rom_path = "test-roms/graphics-test-roms/joypad_test.gb";
 
     // rom_path = "test-roms/gb-test-roms/oam_bug/rom_singles/1-lcd_sync.gb";
 
