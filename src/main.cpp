@@ -110,6 +110,9 @@ bool sdl_event_loop(bool& main_loop_running) {
 
                 case SDL_SCANCODE_J: joy->buttons.A = true; break;
                 case SDL_SCANCODE_K: joy->buttons.B = true; break;
+
+                case SDL_SCANCODE_BACKSPACE: joy->buttons.SELECT = true; break;
+                case SDL_SCANCODE_RETURN: joy->buttons.START = true; break;
                 default: break;
             }
         }
@@ -124,6 +127,9 @@ bool sdl_event_loop(bool& main_loop_running) {
 
                 case SDL_SCANCODE_J: joy->buttons.A = false; break;
                 case SDL_SCANCODE_K: joy->buttons.B = false; break;
+
+                case SDL_SCANCODE_BACKSPACE: joy->buttons.SELECT = false; break;
+                case SDL_SCANCODE_RETURN: joy->buttons.START = false; break;
                 default: break;
             }
         }
