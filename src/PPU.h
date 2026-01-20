@@ -75,7 +75,6 @@ class PPU {
     FIFO<Pixel, PXL_FIFO_DEPTH> pixels;
     FIFO<Object, OBJ_FIFO_DEPTH> objects;
 
-    TileType get_fallback_tile_type(int pixel_x);
     void tick_oam_dma();
     void update_stat_mode();
 
@@ -90,12 +89,10 @@ public:
     void draw_pixels();
     void oam_scan();
     void fetch_pixel(int pixel_x);
-    void fetch_pixel_optimized(int pixel_x);
-    bool fetch_object_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, Object &obj, std::ostringstream& debug_oss);
-    bool fetch_bg_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss);
-    bool fetch_win_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data);
+    bool fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Object &obj, std::ostringstream& debug_oss);
+    bool fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss);
+    bool fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
     void render_pixel();
-    int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss, Object& obj);
     void oam_dma_transfer(uint8_t source_page);
 
     PPU();
