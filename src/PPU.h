@@ -81,6 +81,7 @@ class PPU {
 
 public:
     uint8_t ly;
+    uint8_t scx_sampled, scy_sampled;
     int oam_dma_cycles_remaining;  // Tracks OAM DMA transfer progress (160 M-cycles)
 
     PPUMode mode;
@@ -89,6 +90,10 @@ public:
     void draw_pixels();
     void oam_scan();
     void fetch_pixel(int pixel_x);
+    void fetch_pixel_optimized(int pixel_x);
+    bool fetch_object_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, Object &obj, std::ostringstream& debug_oss);
+    bool fetch_bg_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss);
+    bool fetch_win_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data);
     void render_pixel();
     int get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss, Object& obj);
     void oam_dma_transfer(uint8_t source_page);

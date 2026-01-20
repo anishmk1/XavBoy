@@ -261,6 +261,354 @@ void PPU::render_pixel() {
 }
 
 /**
+ * Returns if the static object tile data is valid
+ */
+bool PPU::fetch_object_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, Object &obj, std::ostringstream& debug_oss) {
+    // ------------------------------------------- //
+    //              Get Object Tile                //
+    // ------------------------------------------- //
+    // Object obj;
+    // int obj_color_id = 0;
+    uint8_t lcdc = mem->get(REG_LCDC);
+    bool found_object = false;
+    if ((lcdc >> LCDC_OBJ_ENABLE_BIT) & 0b1) {
+
+        debug_oss << "         objects.size = " << objects.size << std::endl;
+        for (int i = 0; i < OBJ_FIFO_DEPTH; i++) {
+            obj = objects.fifo[i];
+
+            if ((pixel_x >= (obj.x_pos - 8)) && (pixel_x < obj.x_pos)) {
+                found_object = true;
+                debug_oss << "         found objects.fifo[" << i << "]" << std::endl;
+                break;
+            }
+        }
+
+        if (found_object == false) return false;
+
+        uint16_t tile_data_base_addr = 0x8000;
+        int tile_id = obj.tile_index;
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+
+        // std::array<uint8_t, 16> tile_data;
+        for (int i = 0; i < 16; i++) {
+            // Populating each byte of tile data
+            tile_data[i] = mem->get(tile_data_addr + i);
+        }
+
+        debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
+        debug_oss << "         Tile_data = "; for (int i = 0; i < 16; i++) { debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "; } debug_oss << std::endl;
+
+        return true;
+
+    } else {
+        // DBG ("         Objects are disabled; lcdc = 0x" << std::hex << static_cast<int>(lcdc) << std::endl);
+
+        return false;
+    }
+
+}
+
+bool PPU::fetch_bg_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss) {
+    // bool fetching_new_tile = false;
+    uint8_t lcdc = mem->get(REG_LCDC);
+
+    if (((lcdc >> LCDC_BG_WINDOW_ENABLE_BIT) & 0b1) == 0) {
+
+        return false;   // BG disabled
+    }
+
+    if (((pixel_x + scx_sampled) % 8 == 0)) {
+        debug_oss << "         BG" << std::endl;
+
+        // Fetch background tile
+
+        // The scroll registers are re-read on each tile fetch
+        if (pixel_x == 0) {
+            scy_sampled = mem->get(REG_SCY);
+            scx_sampled = mem->get(REG_SCX);
+        } else {
+            scy_sampled = mem->get(REG_SCY);
+            scx_sampled |= (mem->get(REG_SCX) & 0xf8);  // Do not update bottom 3 bits of scx mid-scanline
+        }
+
+        // First get which tile to use - tile ID (from 0x9800 to 0x9Bff) (8 bit value)
+        // Background tile - Get the tile_id_base_addr based on the current scroll viewport withing 256x256 pixel BG map
+        int scroll_adj_tile_ofst_x = (scx_sampled + pixel_x) / 8;
+        int scroll_adj_tile_ofst_y = (scy_sampled + ly) / 8;
+        uint16_t tile_id_addr = 0x9800 + (scroll_adj_tile_ofst_y * 32) + scroll_adj_tile_ofst_x;
+
+        // fetching_new_tile = true;
+
+        // Background and Window use the same tile maps array. They only differ in which
+        // tiles they reference (tile_id)
+        // if (fetching_new_tile) {
+        // FIXME:: Replace with common function for BG/WIN
+        int tile_id;
+        uint16_t tile_data_base_addr = 0;
+
+        if ((lcdc >> LCDC_BG_WINDOW_TILES_BIT) & 0b1) {
+            // The “$8000 method” (Default): with unsigned addressing
+            tile_data_base_addr = 0x8000;
+            tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
+        } else {
+            // The “$8800 method”: with signed addressing
+            tile_data_base_addr = 0x9000;
+            tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
+        }
+
+        // tile_id <- tile_id_addr
+        debug_oss << "         tile_id=" << tile_id << "; tile_id_addr=0x" << std::hex << static_cast<int>(tile_id_addr) << std::endl;
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+        for (int i = 0; i < 16; i++) {
+            // Populating each byte of tile data
+            tile_data[i] = mem->get(tile_data_addr + i);
+        }
+
+        debug_oss << "         tile_data_addr=" << std::hex << static_cast<int>(tile_data_addr)
+                    << "; tile_data_base_addr=0x" << static_cast<int>(tile_data_base_addr) << std::endl;
+        debug_oss << "         Tile_data = ";
+        for (int i = 0; i < 16; i++) {
+            debug_oss << std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ";
+        }
+        debug_oss << std::endl;
+        // DBG ("         Tile_data = ");
+        // for (int i = 0; i < 16; i++) {
+        //     DBG (std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ");
+        // }
+        // DBG (std::endl);
+    }
+
+    // Background Tile data is valid as long as BG is enabled
+    return true;
+}
+
+
+bool PPU::fetch_win_tile_optimized(int pixel_x, std::array<uint8_t, 16>& tile_data) {
+
+    uint8_t lcdc = mem->get(REG_LCDC);
+
+    bool curr_pxl_covered_by_window = false;
+    if (((lcdc >> LCDC_BG_WINDOW_ENABLE_BIT) & 0b1) &&  // BG/Window Enabled
+        ((lcdc >> LCDC_WINDOW_ENABLE_BIT) & 0b1)) {     // Window Enabled
+
+        uint8_t wy = mem->get(REG_WY);
+        uint8_t wx = mem->get(REG_WX);
+        if ((ly >= wy) && (pixel_x >= (wx - 7))) {
+            curr_pxl_covered_by_window = true;
+        }
+    }
+
+    if (curr_pxl_covered_by_window == false) {
+        return false;
+    }
+
+    if ((pixel_x - (wx-7)) % 8 == 0) {
+        // debug_oss << "         WIN" << std::endl;
+
+        uint16_t tile_id_base_addr;
+        if (((lcdc >> LCDC_WINDOW_TILEMAP_BIT) & 0x01) == 0) {
+            tile_id_base_addr = 0x9800;
+        } else {
+            tile_id_base_addr = 0x9C00;
+        }
+
+        int tile_ofst_x = (pixel_x / 8);
+        int tile_ofst_y = (ly / 8);
+        // Note: 32 = the number of tiles per row - and each tile id is one byte and occuppies one mem address
+        uint16_t tile_id_addr = tile_id_base_addr + (tile_ofst_y * 32) + tile_ofst_x;
+
+        // fetching_new_tile = true;
+
+        // debug_oss << "         WX=" << std::dec << static_cast<int>(wx) << "; WY=" << static_cast<int>(wy) << std::endl;
+        // FIXME:: Replace with common function for BG/WIN
+
+        int tile_id;
+        uint16_t tile_data_base_addr = 0;
+
+        bool lcdc_4 = ((mem->get(REG_LCDC) >> LCDC_BG_WINDOW_TILES_BIT) & 0b1);
+        if (lcdc_4 == 1) {
+            // The “$8000 method” (Default): with unsigned addressing
+            tile_data_base_addr = 0x8000;
+            tile_id = static_cast<uint8_t>(mem->get(tile_id_addr));
+        } else {
+            // The “$8800 method”: with signed addressing
+            tile_data_base_addr = 0x9000;
+            tile_id = static_cast<int8_t>(mem->get(tile_id_addr));
+        }
+
+
+        uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
+        for (int i = 0; i < 16; i++) {
+            // Populating each byte of tile data
+            tile_data[i] = mem->get(tile_data_addr + i);
+        }
+
+        // win tile data is refreshed and valid
+        return true;
+    }
+
+    // win tile data is not refreshed -> reusing old win tile data
+    // But is still valid
+    return true;
+}
+
+/**
+ * 
+ * Fetch pixel works in 2 stages:
+ * 
+ * 1) Fetch / Refresh tile data
+ *      Conditions for fetching new files: (else function will reuse static tile data computed in an earlier pixel same tile)
+ *         Objects -> if curr x,y is covered by an object, fetch the entire obj tile and keep it stored
+ *         Window -> if (window is enabled and our x and y are covered by the window) AND window tile boundary
+ *         Background -> if BG enabled, find tile boundaries and always fetch
+ *      
+ *      If a new tile is not fetched, then the curr x,y is a part of the same tile as the last fetched tile
+ *      and the same static tile_data is reused (saves time from refetching for each of the 8 pixel_x in a tile)
+ *           
+ * 2) Pixel Selection
+ *      For this x,y figure out whether the pixel should come from obj/bg/win
+ *      Conditions to display pixel of:
+ *         Objects: If curr x,y is covered by an object and the relevant pixel is not transparent
+ *         Window: No object/transparent pixel AND window is enabled AND curr xy is covered by window
+ *         Background: No obj/window pixel AND Background is enabled
+ *         White screen: BG/WIN/OBJ disabled
+ *  
+ */
+void PPU::fetch_pixel_optimized(int pixel_x) {
+    if (pixel_x >= 160) return;     // DRAW_PIXELS runs for 200 dots in XavBoy (arbitrary) so remaining dots just wait
+
+    // 1st get object info on this tile. See if it is pass through
+
+    // Also object tile and fallback tile (bg/win) fetching should be stored in static vars.
+    // I dont want to keep fetching the same tile for every pixel
+
+    static std::array<uint8_t, 16> obj_tile_data, win_tile_data, bg_tile_data;
+    bool obj_tile_data_valid, win_tile_data_valid, bg_tile_data_valid;
+    std::ostringstream bg_debug_oss, win_debug_oss, obj_debug_oss;
+
+    // uint8_t lcdc = mem->get(REG_LCDC);
+    
+    int color_id;
+
+    Object obj;
+
+
+    // --------------------------------------------- //
+    //      Stage 1: Fetch / Refresh Tile Data       //
+    // --------------------------------------------- //
+    obj_tile_data_valid = fetch_object_tile_optimized(pixel_x, obj_tile_data, obj, obj_debug_oss);
+    bg_tile_data_valid = fetch_bg_tile_optimized(pixel_x, bg_tile_data, bg_debug_oss);
+    win_tile_data_valid = fetch_win_tile_optimized(pixel_x, win_tile_data);
+
+    DBG( "      pxl_x = " << std::dec << pixel_x << "; ");
+    DBG( "OBJ: " << obj_tile_data_valid << "; WIN: " << win_tile_data_valid << "; BG: " << bg_tile_data_valid << std::endl);
+
+    if (obj_tile_data_valid) DBG(obj_debug_oss.str());
+    if (win_tile_data_valid) DBG(win_debug_oss.str());
+    if (bg_tile_data_valid) DBG(bg_debug_oss.str());
+
+    // ------------------------------------------------- //
+    //      Stage 2: Final Display Pixel Selection       //
+    // ------------------------------------------------- //
+    int obj_color_id = 0;
+    if (obj_tile_data_valid) {
+        // Where in the sprite tile is this current (x,y)?
+        unsigned int tile_local_y = (ly - (obj.y_pos - 16));    // This difference is bounded by [0, 8] (or 16). 
+        uint8_t lsb_byte = obj_tile_data[2*tile_local_y];
+        uint8_t msb_byte = obj_tile_data[2*tile_local_y + 1];
+
+        unsigned int tile_local_x = (pixel_x - (obj.x_pos - 8));
+        int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
+        int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
+        // int color_id = color_id_lsb + (color_id_msb << 1);
+        obj_color_id = color_id_lsb + (color_id_msb << 1);
+        
+        // obj_debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
+        DBG( "         Tile_data = "); for (int i = 0; i < 16; i++) { DBG( std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(obj_tile_data[i]) << " "); } DBG(std::endl);
+
+        DBG( "         obj x_pos=0x" << std::hex << static_cast<int>(obj.x_pos) << "; y_pos=0x" << static_cast<int>(obj.y_pos) << std::endl);
+        DBG( "         obj tile_local_x=" << tile_local_x << "; tile_local_y=" << tile_local_y << std::endl);
+        DBG( "         obj lsb_byte=" << std::hex << static_cast<int>(lsb_byte) << "; msb_byte=" << static_cast<int>(msb_byte) << std::endl);
+        DBG( "         color_id_lsb=" << color_id_lsb << "; color_id_msb=" << color_id_msb << std::endl);
+        DBG( "         Object obj_color_id = " << obj_color_id << std::endl);
+        // return color_id;
+    }
+
+    if (obj_color_id != 0) {
+        DBG ("         Display Object Pixel" << std::endl);
+        // ---------------------- Display Object Pixel ---------------------
+        color_id = obj_color_id;
+        // curr_pxl_tile_type = TileType::OBJECT;
+
+        Pixel pxl{};
+        pxl.valid = true;
+        // get_pixel_from_color_id_optimized(pxl, obj_color_id, TileType::OBJECT, obj);
+        uint8_t color_palette;
+
+        color_palette = mem->get(REG_OBP0 + obj.dmg_palette);
+        pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+
+        pixels.push(pxl);
+        return;
+
+    } else {
+        // obj color id == 0 : either no object or transparent object pixel
+        // Fallback to Background / Window tile
+
+        DBG ("         Display BG/WIN Pixel" << std::endl);
+
+        // ---------------------- Display BG/WIN Pixel ---------------------
+        // Compute the pixel to push into the FIFO on this dot - given tiledata and LY value
+        Pixel pxl{};
+        pxl.valid = true;
+
+        if (win_tile_data_valid) {
+            int tile_local_y = (scy_sampled + ly) % 8;      // which row of the current tile does this pixel lie in?
+            uint8_t lsb_byte = win_tile_data[2*tile_local_y];
+            uint8_t msb_byte = win_tile_data[2*tile_local_y + 1];
+
+            int tile_local_x = (scx_sampled + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
+            int color_id_lsb = (lsb_byte >> (7 -tile_local_x)) & 0b1;
+            int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
+            color_id = color_id_lsb + (color_id_msb << 1);
+
+            uint8_t color_palette;
+
+            color_palette = mem->get(REG_BGP);
+            pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+            
+        } else if (bg_tile_data_valid) {
+            int tile_local_y = (scy_sampled + ly) % 8;      // which row of the current tile does this pixel lie in?
+            uint8_t lsb_byte = bg_tile_data[2*tile_local_y];
+            uint8_t msb_byte = bg_tile_data[2*tile_local_y + 1];
+
+            int tile_local_x = (scx_sampled + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
+            int color_id_lsb = (lsb_byte >> (7 -tile_local_x)) & 0b1;
+            int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
+            color_id = color_id_lsb + (color_id_msb << 1);
+
+            uint8_t color_palette;
+
+            color_palette = mem->get(REG_BGP);
+            pxl.color = static_cast<Color>((color_palette >> (2 * color_id)) & 0b11);
+
+            DBG ("         Color = " << static_cast<int>(pxl.color) << std::endl);
+        } else {
+            // UNASSIGNED white pixel
+
+            // When LCDC Bit 0 is cleared, both background and window become blank (white), only objects can still be displayed
+            pxl.color = Color::WHITE;
+        }
+
+
+        pixels.push(pxl);
+
+    }
+
+}
+
+/**
  * Fetch the background/window tile for this pixel_x. This will
  * display when there is no overlapping object or if the object tile has color 0 pixels
  */
@@ -285,9 +633,6 @@ TileType PPU::get_fallback_tile_type(int pixel_x) {
 }
 
 
-// FIXME: [p3] This whole fetch pixel function is kind of messy. I dont like the calculation of fallback pixel type
-// and then getting the relevant data for that (between BG/WIN) and then also computing object (in another function..)
-// and then seeing if it falls through based on the color = 0.. Find a way to rewrite this
 /**
  * Given a pixel x coordinate on the screen - from 0 - 159, fetch and compute the pixel data (Color) and push it to fifo
  */
@@ -518,6 +863,10 @@ int PPU::get_object_color_id(int pixel_x, std::ostringstream& obj_debug_oss, Obj
         int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
         int color_id = color_id_lsb + (color_id_msb << 1);
 
+        obj_debug_oss << "         obj x_pos=0x" << std::hex << static_cast<int>(obj.x_pos) << "; y_pos=0x" << static_cast<int>(obj.y_pos) << std::endl;
+        obj_debug_oss << "         obj tile_local_x=" << tile_local_x << "; tile_local_y=" << tile_local_y << std::endl;
+        obj_debug_oss << "         obj lsb_byte=" << std::hex << static_cast<int>(lsb_byte) << "; msb_byte=" << static_cast<int>(msb_byte) << std::endl;
+        obj_debug_oss << "         color_id_lsb=" << color_id_lsb << "; color_id_msb=" << color_id_msb << std::endl;
         obj_debug_oss << "         Object color_id = " << color_id << std::endl;
         return color_id;
     } else {
@@ -624,12 +973,16 @@ void PPU::ppu_tick(int mcycles){
 
                 int pixel_x = (dot_cnt - 81);
 
-                fetch_pixel(pixel_x);   // Pushes each pixel to the fifo
+                // fetch_pixel(pixel_x);   // Pushes each pixel to the fifo
+
+                // COMPLEX OBJECTS IS NOT MATCHING !!!!!
+                // ALSO IS COMPLEX OBJECTS WORKING CORRECTLY FOR THE ORIGINAL FUNCTION ?
+                // WHAT IS THE TILE AT THE BOTTOM?
+                fetch_pixel_optimized(pixel_x);   // refactor
 
                 
                 // Note: Fixing DRAW_PIXELS to always take up 200 dots. This is sufficient to run most games since most games just care that VBLANK intrpt is received at the right time
                 //       HBLANK timing accuracy generally doesnt matter except for niche raster/parallax effects.
-                // TODO: Should actually be variable dot cnt length based on hardware accurate fetcher/fifo modeling. And HBLANK covers the rest - low priority
                 if (dot_cnt == 280){
                     DBG(std::endl << "   [LY = " << std::dec << static_cast<int>(curr_LY) << "] DRAW_PIXELS: dot_cnt == 280. Moving to HBLANK @ mcycle = " << dbg->mcycle_cnt << std::endl);
 

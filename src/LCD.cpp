@@ -66,14 +66,11 @@ int LCD::get_fb_y() {return this->framebuffer_write_ptr_y;}
 
 
 void LCD::write_to_framebuffer(Pixel& pxl) {
-    // Pixel pixels[8];
-    // ppu->pop_pixel_fifo(pixels);
-
-    // for (int i = 0; i < 8; i++) {
-    // Pixel pxl = pixels[i];
     uint32_t pxl_rgb = dmg_palette[static_cast<int>(pxl.color)];
 
     framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl_rgb;
+    DBG ("         pxl_rgb = " << std::hex << static_cast<unsigned int>(pxl_rgb)
+            << "; pxl.color = " << static_cast<int>(pxl.color) << std::endl);
     // if (dbg->frame_cnt == 1) {
 #ifndef REL_MODE
     dbg->last_framebuffer[framebuffer_write_ptr_y][framebuffer_write_ptr_x] = pxl.color;    // SAVE COPY FOR DEBUG
@@ -207,6 +204,13 @@ void LCD::draw_frame() {
 
     // if (expected_pitch != provided_pitch) {
     //     debug_file << "Warning: Pitch mismatch detected!" << std::endl;
+    // }
+
+    // for (int y = 0; y < SCREEN_HEIGHT; y++) {
+
+    //     for (int x = 0; x < SCREEN_WIDTH; x++) {
+    //         DBG (framebuffer[y][x])
+    //     }
     // }
 
 
