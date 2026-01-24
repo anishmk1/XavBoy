@@ -46,6 +46,7 @@ bool DEBUGGER = false;
 bool PRINT_REGS_EN = true;
 bool CPU_ONLY = false;
 bool SKIP_BOOT_ROM = false;         // default: false; Ninentdo logo boot rom runs by default on startup
+bool DBG_ENABLED = true;            // default: enabled when DEBUG_MODE is set
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 
@@ -201,7 +202,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_window.gb";
     // rom_path = "test-roms/graphics-test-roms/color_bands_with_moving_window.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_objects.gb";
-    rom_path = "test-roms/graphics-test-roms/complex_objects.gb";
+    // rom_path = "test-roms/graphics-test-roms/complex_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
     // rom_path = "test-roms/graphics-test-roms/joypad_test.gb";
 
@@ -209,6 +210,7 @@ int emulate(int argc, char* argv[]) {
 
     // ---------------------------------------- GAMES ------------------------------------------------
     // rom_path = "../GameBoy_ROMS/Tetris (World) (Rev 1).gb";
+    rom_path = "../tetris-gb-disasm/disasm/tetris.gb";
 
 
     // Note: To produce Debug roms (With .sym dbeugger symbols)
@@ -355,6 +357,8 @@ int main(int argc, char* argv[]) {
             CPU_ONLY = true;
         } else if (strcmp(argv[i], "--skip-boot-rom") == 0) {
             SKIP_BOOT_ROM = true;
+        } else if (strcmp(argv[i], "--no-dbg") == 0) {
+            DBG_ENABLED = false;
         }
     }
 
@@ -373,6 +377,9 @@ int main(int argc, char* argv[]) {
     emulate(argc, argv);
 
     lcd->close_window();
+
+    std::exit(EXIT_SUCCESS);        // Thinkpad doesnt like pthread_exit(NULL) for some reason
+
     delete lcd;
     delete dbg;
     delete ppu;

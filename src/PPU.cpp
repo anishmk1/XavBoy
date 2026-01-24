@@ -185,7 +185,6 @@ void PPU::oam_scan() {
         }
 
         // First 10 objects (in increasing memory address order) are "selected"
-        // FIXME: Account for sprite size
         bool obj_size = (mem->get(REG_LCDC) >> LCDC_OBJ_SIZE_BIT) & 0x01;
         int sprite_y_boundary = (obj_size == 1) ? (object_data[OBJ_Y_POS]) : ((object_data[OBJ_Y_POS]) - 8) ;
 
@@ -584,11 +583,12 @@ void PPU::fetch_pixel(int pixel_x) {
         if (win_tile_data_valid) {
             // FIXME: Bug - window should not use scroll registers for tile_local calculation
             // Should be: tile_local_y = (ly - wy) % 8, tile_local_x = (pixel_x - (wx - 7)) % 8
-            int tile_local_y = (scy_sampled + ly) % 8;      // which row of the current tile does this pixel lie in?
+            // int tile_local_y = (scy_sampled + ly) % 8;      // which row of the current tile does this pixel lie in?
+            int tile_local_y = (ly - wy) % 8;      // which row of the current tile does this pixel lie in?
             uint8_t lsb_byte = win_tile_data[2*tile_local_y];
             uint8_t msb_byte = win_tile_data[2*tile_local_y + 1];
 
-            int tile_local_x = (scx_sampled + pixel_x) % 8;    // which column of the current tile does this pixel lie in?
+            int tile_local_x = (pixel_x - (wx - 7)) % 8;    // which column of the current tile does this pixel lie in?
             int color_id_lsb = (lsb_byte >> (7 -tile_local_x)) & 0b1;
             int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
             color_id = color_id_lsb + (color_id_msb << 1);
@@ -637,14 +637,16 @@ void PPU::ppu_tick(int mcycles){
 
     // FIXME REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     #ifndef REL_MODE
-    if (dbg->mcycle_cnt >= 20000000) {
-        printx ("Run for enough time (mcycles). Exit\n");
-        DBG("Run for enough time (mcycles). Exit" << std::endl);
-        std::exit(EXIT_SUCCESS);
-    } else if (dbg->frame_cnt >= 20) {
-        printx ("Run for enough time (20 Frames). Exit\n");
-        DBG("Run for enough time (20 Frames). Exit" << std::endl);
-        std::exit(EXIT_SUCCESS);
+    if (DBG_ENABLED) {
+        if (dbg->mcycle_cnt >= 20000000) {
+            printx ("Run for enough time (mcycles). Exit\n");
+            DBG("Run for enough time (mcycles). Exit" << std::endl);
+            std::exit(EXIT_SUCCESS);
+        } else if (dbg->frame_cnt >= 20) {
+            printx ("Run for enough time (20 Frames). Exit\n");
+            DBG("Run for enough time (20 Frames). Exit" << std::endl);
+            std::exit(EXIT_SUCCESS);
+        }
     }
     #endif
     // FIXME REMOVE !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

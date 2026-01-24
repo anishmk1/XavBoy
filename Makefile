@@ -16,9 +16,14 @@ endif
 
 # User options
 SKIP_BOOT_ROM ?= 0
+DISABLE_DBG ?= 0
 
 ifeq ($(SKIP_BOOT_ROM),1)
     EXTRA_RUN_ARGS += --skip-boot-rom
+endif
+
+ifeq ($(DISABLE_DBG),1)
+    EXTRA_RUN_ARGS += --no-dbg
 endif
 
 # CXX = g++

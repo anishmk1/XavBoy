@@ -73,13 +73,14 @@ constexpr uint8_t JOYPAD_BIT    = 1 << 4;  // Bit 4
             if (addr == DIV) {
                 val = 0;  // Writing any value to DIV resets it to 0
             } else if (addr == JOYPAD) {
-
                 if (!backdoor) {
-                    uint8_t ro_bits = mem->memory[JOYPAD];
-                    ro_bits &= 0b00001111;      // get current lower read only nibble value
-                    val |= ro_bits;             // preserve lower nibble
+                    // Store the new select bits (upper nibble) immediately
+                    // Keep lower nibble as 0xF (no buttons pressed) temporarily
+                    mem->memory[JOYPAD] = (val & 0b00110000) | 0b11001111;
 
+                    // Now update button state based on new select bits
                     joy->update_button_state();
+                    return 0;  // Don't let the default write overwrite button state
                 }
             } 
 
