@@ -531,14 +531,27 @@ void PPU::fetch_pixel(int pixel_x) {
     int obj_color_id = 0;
     if (obj_tile_data_valid) {
         // Where in the sprite tile is this current (x,y)?
-        unsigned int tile_local_y = (ly - (obj.y_pos - 16));    // This difference is bounded by [0, 8] (or 16). 
+        unsigned int tile_local_y = (ly - (obj.y_pos - 16));    // This difference is bounded by [0, 8] (or 16).
+
+        // Apply Y-flip if set
+        if (obj.y_flip) {
+            uint8_t lcdc = mem->get(REG_LCDC);
+            bool obj_size = (lcdc >> LCDC_OBJ_SIZE_BIT) & 0x01;
+            tile_local_y = (obj_size ? 15 : 7) - tile_local_y;
+        }
+
         uint8_t lsb_byte = obj_tile_data[2*tile_local_y];
         uint8_t msb_byte = obj_tile_data[2*tile_local_y + 1];
 
         unsigned int tile_local_x = (pixel_x - (obj.x_pos - 8));
+
+        // Apply X-flip if set
+        if (obj.x_flip) {
+            tile_local_x = 7 - tile_local_x;
+        }
+
         int color_id_lsb = (lsb_byte >> (7 - tile_local_x)) & 0b1;
         int color_id_msb = (msb_byte >> (7 - tile_local_x)) & 0b1;
-        // int color_id = color_id_lsb + (color_id_msb << 1);
         obj_color_id = color_id_lsb + (color_id_msb << 1);
         
         // obj_debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;

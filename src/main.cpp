@@ -205,6 +205,7 @@ int emulate(int argc, char* argv[]) {
     // rom_path = "test-roms/graphics-test-roms/complex_objects.gb";
     // rom_path = "test-roms/graphics-test-roms/simple_infinite_loop.gb";
     // rom_path = "test-roms/graphics-test-roms/joypad_test.gb";
+    // rom_path = "test-roms/graphics-test-roms/flip_objects.gb";
 
     // rom_path = "test-roms/gb-test-roms/oam_bug/rom_singles/1-lcd_sync.gb";
 
