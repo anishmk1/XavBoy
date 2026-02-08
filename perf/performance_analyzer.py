@@ -8,7 +8,7 @@ and creates visualizations showing time spent in each component per frame.
 Usage:
     python3 performance_analyzer.py [csv_file_path] [suffix]
 
-If no path is provided, it defaults to 'logs/performance.csv'
+If no path is provided, it defaults to 'performance.csv' (in same directory as script)
 If suffix is provided, it will be appended to output filenames (e.g., suffix "2" creates "performance_stacked-2.png")
 """
 
@@ -49,9 +49,11 @@ def print_summary_statistics(df):
     print(f"Estimated FPS: {fps_estimate:.2f}")
 
     # Component timing statistics
-    components = ['cpu_time_ms', 'ppu_time_ms', 'mmio_time_ms', 'lcd_time_ms',
+    components = ['cpu_time_ms', 'ppu_time_ms', 'ppu_oam_scan_time_ms', 'ppu_draw_pixels_time_ms',
+                  'ppu_hblank_time_ms', 'ppu_vblank_time_ms', 'mmio_time_ms', 'lcd_time_ms',
                   'sdl_events_time_ms', 'debugger_time_ms', 'interrupt_time_ms', 'other_time_ms']
-    component_names = ['CPU', 'PPU', 'MMIO', 'LCD', 'SDL Events', 'Debugger', 'Interrupt', 'Other']
+    component_names = ['CPU', 'PPU', 'PPU OAM Scan', 'PPU Draw', 'PPU HBlank', 'PPU VBlank',
+                       'MMIO', 'LCD', 'SDL Events', 'Debugger', 'Interrupt', 'Other']
 
     print(f"\n{'Component':<8} {'Avg (ms)':<10} {'% of Total':<12} {'Min (ms)':<10} {'Max (ms)':<10}")
     print("-" * 60)
@@ -65,7 +67,7 @@ def print_summary_statistics(df):
         print(f"{name:<8} {avg_time:<10.4f} {percentage:<12.2f} {min_time:<10.4f} {max_time:<10.4f}")
 
 
-def create_performance_plots(df, output_dir="plots", suffix=""):
+def create_performance_plots(df, output_dir=".", suffix=""):
     """Create stacked column chart showing component performance per frame."""
 
     # Create output directory if it doesn't exist
@@ -77,10 +79,14 @@ def create_performance_plots(df, output_dir="plots", suffix=""):
 
     # Component colors
     colors = {
-        'CPU': '#4285F4',      # Blue
-        'PPU': '#34A853',      # Green
-        'MMIO': '#EA4335',     # Red
-        'LCD': '#FBBC04',      # Yellow
+        'CPU': '#4285F4',          # Blue
+        'PPU': '#34A853',          # Green
+        'PPU OAM Scan': '#2E7D32', # Dark Green
+        'PPU Draw': '#66BB6A',     # Light Green
+        'PPU HBlank': '#A5D6A7',   # Pale Green
+        'PPU VBlank': '#1B5E20',   # Very Dark Green
+        'MMIO': '#EA4335',         # Red
+        'LCD': '#FBBC04',          # Yellow
         'SDL Events': '#9C27B0',   # Purple
         'Debugger': '#FF5722',     # Deep Orange
         'Interrupt': '#607D8B',    # Blue Grey
@@ -91,6 +97,10 @@ def create_performance_plots(df, output_dir="plots", suffix=""):
     frame_numbers = df['frame_number']
     cpu_times = df['cpu_time_ms']
     ppu_times = df['ppu_time_ms']
+    ppu_oam_scan_times = df['ppu_oam_scan_time_ms']
+    ppu_draw_pixels_times = df['ppu_draw_pixels_time_ms']
+    ppu_hblank_times = df['ppu_hblank_time_ms']
+    ppu_vblank_times = df['ppu_vblank_time_ms']
     mmio_times = df['mmio_time_ms']
     lcd_times = df['lcd_time_ms']
     sdl_times = df['sdl_events_time_ms']
@@ -99,24 +109,32 @@ def create_performance_plots(df, output_dir="plots", suffix=""):
     other_times = df['other_time_ms']
 
     # Calculate bottoms for stacking
-    cpu_bottom = np.zeros(len(frame_numbers))
-    ppu_bottom = cpu_times
-    mmio_bottom = cpu_times + ppu_times
-    lcd_bottom = cpu_times + ppu_times + mmio_times
-    sdl_bottom = cpu_times + ppu_times + mmio_times + lcd_times
-    debugger_bottom = cpu_times + ppu_times + mmio_times + lcd_times + sdl_times
-    interrupt_bottom = cpu_times + ppu_times + mmio_times + lcd_times + sdl_times + debugger_times
-    other_bottom = cpu_times + ppu_times + mmio_times + lcd_times + sdl_times + debugger_times + interrupt_times
+    bottom = np.zeros(len(frame_numbers))
 
     # Create stacked bars
-    plt.bar(frame_numbers, cpu_times, bottom=cpu_bottom, color=colors['CPU'], label='CPU', alpha=0.8)
-    plt.bar(frame_numbers, ppu_times, bottom=ppu_bottom, color=colors['PPU'], label='PPU', alpha=0.8)
-    plt.bar(frame_numbers, mmio_times, bottom=mmio_bottom, color=colors['MMIO'], label='MMIO', alpha=0.8)
-    plt.bar(frame_numbers, lcd_times, bottom=lcd_bottom, color=colors['LCD'], label='LCD', alpha=0.8)
-    plt.bar(frame_numbers, sdl_times, bottom=sdl_bottom, color=colors['SDL Events'], label='SDL Events', alpha=0.8)
-    plt.bar(frame_numbers, debugger_times, bottom=debugger_bottom, color=colors['Debugger'], label='Debugger', alpha=0.8)
-    plt.bar(frame_numbers, interrupt_times, bottom=interrupt_bottom, color=colors['Interrupt'], label='Interrupt', alpha=0.8)
-    plt.bar(frame_numbers, other_times, bottom=other_bottom, color=colors['Other'], label='Other', alpha=0.8)
+    plt.bar(frame_numbers, cpu_times, bottom=bottom, color=colors['CPU'], label='CPU', alpha=0.8)
+    bottom += cpu_times
+    plt.bar(frame_numbers, ppu_times, bottom=bottom, color=colors['PPU'], label='PPU', alpha=0.8)
+    bottom += ppu_times
+    plt.bar(frame_numbers, ppu_oam_scan_times, bottom=bottom, color=colors['PPU OAM Scan'], label='PPU OAM Scan', alpha=0.8)
+    bottom += ppu_oam_scan_times
+    plt.bar(frame_numbers, ppu_draw_pixels_times, bottom=bottom, color=colors['PPU Draw'], label='PPU Draw', alpha=0.8)
+    bottom += ppu_draw_pixels_times
+    plt.bar(frame_numbers, ppu_hblank_times, bottom=bottom, color=colors['PPU HBlank'], label='PPU HBlank', alpha=0.8)
+    bottom += ppu_hblank_times
+    plt.bar(frame_numbers, ppu_vblank_times, bottom=bottom, color=colors['PPU VBlank'], label='PPU VBlank', alpha=0.8)
+    bottom += ppu_vblank_times
+    plt.bar(frame_numbers, mmio_times, bottom=bottom, color=colors['MMIO'], label='MMIO', alpha=0.8)
+    bottom += mmio_times
+    plt.bar(frame_numbers, lcd_times, bottom=bottom, color=colors['LCD'], label='LCD', alpha=0.8)
+    bottom += lcd_times
+    plt.bar(frame_numbers, sdl_times, bottom=bottom, color=colors['SDL Events'], label='SDL Events', alpha=0.8)
+    bottom += sdl_times
+    plt.bar(frame_numbers, debugger_times, bottom=bottom, color=colors['Debugger'], label='Debugger', alpha=0.8)
+    bottom += debugger_times
+    plt.bar(frame_numbers, interrupt_times, bottom=bottom, color=colors['Interrupt'], label='Interrupt', alpha=0.8)
+    bottom += interrupt_times
+    plt.bar(frame_numbers, other_times, bottom=bottom, color=colors['Other'], label='Other', alpha=0.8)
 
     # Formatting
     plt.xlabel('Frame Number')
@@ -135,14 +153,13 @@ def create_performance_plots(df, output_dir="plots", suffix=""):
     plt.tight_layout()
     plt.savefig(stacked_filename, dpi=300, bbox_inches='tight')
     print(f"Saved stacked performance chart to {stacked_filename}")
+    plt.close()
 
     # Create pie chart showing average time distribution (excluding first frame)
     create_average_time_pie_chart(df, output_dir, suffix)
 
-    plt.show()
 
-
-def create_average_time_pie_chart(df, output_dir="plots", suffix=""):
+def create_average_time_pie_chart(df, output_dir=".", suffix=""):
     """Create pie chart showing average time distribution excluding first frame."""
 
     # Exclude first frame (frame 1) as it contains setup overhead
@@ -158,6 +175,10 @@ def create_average_time_pie_chart(df, output_dir="plots", suffix=""):
     avg_times = {
         'CPU': df_filtered['cpu_time_ms'].mean(),
         'PPU': df_filtered['ppu_time_ms'].mean(),
+        'PPU OAM Scan': df_filtered['ppu_oam_scan_time_ms'].mean(),
+        'PPU Draw': df_filtered['ppu_draw_pixels_time_ms'].mean(),
+        'PPU HBlank': df_filtered['ppu_hblank_time_ms'].mean(),
+        'PPU VBlank': df_filtered['ppu_vblank_time_ms'].mean(),
         'MMIO': df_filtered['mmio_time_ms'].mean(),
         'LCD': df_filtered['lcd_time_ms'].mean(),
         'SDL Events': df_filtered['sdl_events_time_ms'].mean(),
@@ -179,10 +200,14 @@ def create_average_time_pie_chart(df, output_dir="plots", suffix=""):
 
     # Component colors (matching the stacked chart)
     colors_map = {
-        'CPU': '#4285F4',      # Blue
-        'PPU': '#34A853',      # Green
-        'MMIO': '#EA4335',     # Red
-        'LCD': '#FBBC04',      # Yellow
+        'CPU': '#4285F4',          # Blue
+        'PPU': '#34A853',          # Green
+        'PPU OAM Scan': '#2E7D32', # Dark Green
+        'PPU Draw': '#66BB6A',     # Light Green
+        'PPU HBlank': '#A5D6A7',   # Pale Green
+        'PPU VBlank': '#1B5E20',   # Very Dark Green
+        'MMIO': '#EA4335',         # Red
+        'LCD': '#FBBC04',          # Yellow
         'SDL Events': '#9C27B0',   # Purple
         'Debugger': '#FF5722',     # Deep Orange
         'Interrupt': '#607D8B',    # Blue Grey
@@ -222,16 +247,20 @@ def create_average_time_pie_chart(df, output_dir="plots", suffix=""):
     plt.tight_layout()
     plt.savefig(pie_filename, dpi=300, bbox_inches='tight')
     print(f"Saved average time pie chart to {pie_filename}")
+    plt.close()
 
 
 def main():
     """Main function to run the performance analyzer."""
 
     # Determine CSV file path and suffix
+    # Get directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+
     if len(sys.argv) > 1:
         csv_path = sys.argv[1]
     else:
-        csv_path = "logs/performance.csv"
+        csv_path = os.path.join(script_dir, "performance.csv")
 
     suffix = ""
     if len(sys.argv) > 2:
@@ -247,6 +276,8 @@ def main():
 
     # Validate required columns
     required_columns = ['frame_number', 'cpu_time_ms', 'ppu_time_ms',
+                       'ppu_oam_scan_time_ms', 'ppu_draw_pixels_time_ms',
+                       'ppu_hblank_time_ms', 'ppu_vblank_time_ms',
                        'mmio_time_ms', 'lcd_time_ms', 'sdl_events_time_ms',
                        'debugger_time_ms', 'interrupt_time_ms', 'other_time_ms',
                        'total_frame_time_ms']
@@ -263,7 +294,7 @@ def main():
     print("\nGenerating performance plots...")
     if suffix:
         print(f"Using suffix: {suffix}")
-    create_performance_plots(df, suffix=suffix)
+    create_performance_plots(df, output_dir=script_dir, suffix=suffix)
 
     print("\nAnalysis complete!")
     return 0

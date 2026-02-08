@@ -29,6 +29,7 @@ endif
 # CXX = g++
 CXXFLAGS = -DDEBUG_MODE -Wall -Wextra -std=c++17 $(SDL_CFLAGS)
 CXXRELFLAGS = -DREL_MODE -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
+CXXPROFFLAGS = -DREL_MODE -DPERF_PROFILING -O3 -Wall -Wextra -std=c++17 -DNDEBUG $(SDL_CFLAGS)
 # CXXDBGFLAGS = -g -O2 -Wall -Wextra -std=c++17 -fsanitize=address,undefined $(SDL_CFLAGS)
 # LDDBGFLAGS = -g -O2 -fsanitize=address,undefined -rdynamic
 CXXDBGFLAGS = -DDEBUG_MODE -g -O0 -Wall -Wextra -std=c++17 -fsanitize=address,undefined -fno-omit-frame-pointer -fno-optimize-sibling-calls -fno-inline $(SDL_CFLAGS)
@@ -43,6 +44,12 @@ build_release: clean compile_release link
 
 release: build_release
 	@./myprogram --quiet
+
+profile: clean compile_profile link
+	@mkdir -p perf
+	@./myprogram --quiet
+	@echo "Performance data saved to perf/performance.csv"
+	@echo "Run 'python3 perf/performance_analyzer.py' to generate plots"
 
 step: clean compile link
 	@./myprogram --step $(EXTRA_RUN_ARGS)
@@ -72,6 +79,16 @@ compile_release:
 	@$(CXX) $(CXXRELFLAGS) -c src/LCD.cpp -o bin/LCD.o
 	@$(CXX) $(CXXRELFLAGS) -c src/Joypad.cpp -o bin/Joypad.o
 	@$(CXX) $(CXXRELFLAGS) -c src/main.cpp -o bin/main.o
+
+compile_profile:
+	@$(CXX) $(CXXPROFFLAGS) -c src/Memory.cpp -o bin/Memory.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/CPU.cpp -o bin/CPU.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/PPU.cpp -o bin/PPU.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/Peripherals.cpp -o bin/Peripherals.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/Debug.cpp -o bin/Debug.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/LCD.cpp -o bin/LCD.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/Joypad.cpp -o bin/Joypad.o
+	@$(CXX) $(CXXPROFFLAGS) -c src/main.cpp -o bin/main.o
 
 gdb:
 	@$(CXX) $(CXXDBGFLAGS) -c src/Memory.cpp -o bin/Memory.o

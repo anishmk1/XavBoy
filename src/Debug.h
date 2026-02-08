@@ -7,6 +7,38 @@
 #include <fstream>
 #include "PPU.h"
 
+// ============================================================
+// Performance Profiling
+// ============================================================
+// Enable with: -DPERF_PROFILING in compiler flags
+// Usage:
+//   PERF_NEW_FRAME(dbg)                    - Call at frame boundary
+//   PERF_SECTION(dbg, PerfSection::CPU)    - Call after a section completes
+// ============================================================
+
+enum class PerfSection {
+    CPU,
+    PPU,
+    PPU_OAM_SCAN,
+    PPU_DRAW_PIXELS,
+    PPU_HBLANK,
+    PPU_VBLANK,
+    MMIO,
+    LCD,
+    SDL_EVENTS,
+    DEBUGGER,
+    INTERRUPT,
+    OTHER
+};
+
+#ifdef PERF_PROFILING
+    #define PERF_NEW_FRAME(dbg)             do { (dbg)->new_frame_timing(); } while(0)
+    #define PERF_SECTION(dbg, section)      do { (dbg)->end_section_timing(section); } while(0)
+#else
+    #define PERF_NEW_FRAME(dbg)             do { } while(0)
+    #define PERF_SECTION(dbg, section)      do { } while(0)
+#endif
+
 class CPU;
 
 typedef struct {
@@ -23,6 +55,10 @@ typedef struct {
 typedef struct {
     double cpu_time_ms;
     double ppu_time_ms;
+    double ppu_oam_scan_time_ms;
+    double ppu_draw_pixels_time_ms;
+    double ppu_hblank_time_ms;
+    double ppu_vblank_time_ms;
     double mmio_time_ms;
     double lcd_time_ms;
     double sdl_events_time_ms;
@@ -40,6 +76,10 @@ typedef struct {
     std::chrono::high_resolution_clock::time_point frame_start_time;
     double frame_cpu_time_ms;
     double frame_ppu_time_ms;
+    double frame_ppu_oam_scan_time_ms;
+    double frame_ppu_draw_pixels_time_ms;
+    double frame_ppu_hblank_time_ms;
+    double frame_ppu_vblank_time_ms;
     double frame_mmio_time_ms;
     double frame_lcd_time_ms;
     double frame_sdl_events_time_ms;
@@ -51,6 +91,7 @@ typedef struct {
     std::chrono::high_resolution_clock::time_point last_section_time;
 
     bool csv_logging_enabled;
+    std::ofstream csv_file;  // Keep file open for entire runtime
 } PerfMetrics;
 
 class Debug {
@@ -80,15 +121,12 @@ public:
 
     // CSV performance logging methods
     void init_csv_logging();
-    void start_frame_timing();
-    void log_component_timing(const std::string& component, double time_ms);
-    void finalize_frame_timing();
-    void write_csv_header();
+    void new_frame_timing();  // Ends previous frame (if any) and starts new one
+    void log_component_timing(PerfSection section, double time_ms);
     void write_csv_row(const FramePerfData& data);
 
     // Detailed profiling methods
-    void start_section_timing();
-    void end_section_timing(const std::string& section_name);
+    void end_section_timing(PerfSection section);
 
 };
 

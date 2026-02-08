@@ -70,6 +70,27 @@ make build_release
 | Start | Enter |
 | Select | Backspace |
 
+## Performance Profiling
+
+Build and run with performance instrumentation enabled:
+
+```bash
+make profile
+```
+
+This generates `perf/performance.csv` with per-frame timing data for each component (CPU, PPU, MMIO, etc.).
+
+To generate visualizations:
+
+```bash
+# Requires: sudo apt install python3-pandas python3-matplotlib
+python3 perf/performance_analyzer.py
+```
+
+This creates:
+- `perf/performance_stacked.png` - stacked bar chart of component times per frame
+- `perf/performance_pie_chart.png` - average time distribution
+
 ## Tested Games
 
 - Tetris

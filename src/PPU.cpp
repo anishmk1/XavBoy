@@ -20,6 +20,7 @@
 #include "main.h"
 #include "PPU.h"
 #include "CPU.h"
+#include "Debug.h"
 
 
 template <typename T, int DEPTH>
@@ -699,7 +700,7 @@ void PPU::ppu_tick(int mcycles){
                     wy = mem->get(REG_WY);
 
                     if (curr_LY == 0) {
-                        // double duration = std::chrono::duration<double>(Clock::now() - start_time).count();                        
+                        // double duration = std::chrono::duration<double>(Clock::now() - start_time).count();
                         // start_time = Clock::now();
 
                         // printx ("Frame %0lu duration = %.9f seconds; mcycle_cnt = %0ld\n", dbg->frame_cnt, duration, dbg->mcycle_cnt);
@@ -725,6 +726,7 @@ void PPU::ppu_tick(int mcycles){
                     this->mode = PPUMode::DRAW_PIXELS;
                     update_stat_mode();
                 }
+                PERF_SECTION(dbg, PerfSection::PPU_OAM_SCAN);
                 break;
             }
 
@@ -740,7 +742,7 @@ void PPU::ppu_tick(int mcycles){
 
                 fetch_pixel(pixel_x);   // refactor
 
-                
+
                 // Note: Fixing DRAW_PIXELS to always take up 200 dots. This is sufficient to run most games since most games just care that VBLANK intrpt is received at the right time
                 //       HBLANK timing accuracy generally doesnt matter except for niche raster/parallax effects.
                 if (dot_cnt == 280){
@@ -749,6 +751,7 @@ void PPU::ppu_tick(int mcycles){
                     this->mode = PPUMode::HBLANK;
                     update_stat_mode();
                 }
+                PERF_SECTION(dbg, PerfSection::PPU_DRAW_PIXELS);
                 break;
             }
 
@@ -768,7 +771,7 @@ void PPU::ppu_tick(int mcycles){
                     }
                     update_stat_mode();
                 }
-
+                PERF_SECTION(dbg, PerfSection::PPU_HBLANK);
                 break;
             }
 
@@ -800,6 +803,7 @@ void PPU::ppu_tick(int mcycles){
                     mem->set(REG_LY, new_LY, 1);
                     dot_cnt = 0;        // Starting new scanline - it's just convenient to restart dot_cnt from 0 to 456..
                 }
+                PERF_SECTION(dbg, PerfSection::PPU_VBLANK);
                 break;
             }
 

@@ -255,56 +255,42 @@ int emulate(int argc, char* argv[]) {
     dbg->init_csv_logging();
 
     bool main_loop_running = true;
-    // bool frame_timing_started = false;
+
+    PERF_NEW_FRAME(dbg);  // Start timing first frame
 
     while (main_loop_running) {  // main loop
 
-        // Start frame timing if this is the beginning of a new frame
-        // if (!frame_timing_started) {
-        //     dbg->start_frame_timing();
-        //     frame_timing_started = true;
-        // }
-
-        // SDL events are now polled once per frame (when lcd->frame_ready is true)
-        // instead of every main loop iteration to improve WSL2 performance
-
         dbg->perf.num_main_loops++;
 
-        // Poll SDL events once per frame - set in ppu_tick
+        // Poll SDL events once per frame - set in ppu_tick when frame_ready
         if (joy->poll_sdl_events_ready) {
             if (sdl_event_loop(main_loop_running) == true) {
                 return 0;
             }
-
             joy->poll_sdl_events_ready = false;
+            PERF_SECTION(dbg, PerfSection::SDL_EVENTS);
+
+            PERF_NEW_FRAME(dbg);  // End previous frame, start new frame
         }
 
         dbg->check_for_breakpoints();
-
-        // dbg->start_section_timing();
         dbg->debugger_break();
-        // dbg->end_section_timing("debugger");
-
+        PERF_SECTION(dbg, PerfSection::DEBUGGER);
 
         int mcycles = 1;
         if (!cpu->halt_mode) {
-            // dbg->start_section_timing();
             mcycles = cpu->execute();
-            // dbg->end_section_timing("cpu");
+            PERF_SECTION(dbg, PerfSection::CPU);
         }
 
-        // dbg->start_section_timing();
         ppu->ppu_tick(mcycles);
-        // dbg->end_section_timing("ppu");
+        PERF_SECTION(dbg, PerfSection::PPU);
 
-        // dbg->start_section_timing();
         mmio->incr_timers(mcycles);
-        // dbg->end_section_timing("mmio");
+        PERF_SECTION(dbg, PerfSection::MMIO);
 
         // IE && IF != 0 wakes up CPU from halt mode
-        // dbg->start_section_timing();
         if (cpu->halt_mode) {
-
             if (mmio->exit_halt_mode()) {
                 cpu->halt_mode = false;
             }
@@ -315,11 +301,7 @@ int emulate(int argc, char* argv[]) {
                 cpu->intrpt_info.wait_cycles = 1;
             }
         }
-        // dbg->end_section_timing("interrupt");
-
-        // Track any remaining unaccounted time in this main loop iteration
-        // dbg->start_section_timing();
-        // dbg->end_section_timing("other");
+        PERF_SECTION(dbg, PerfSection::INTERRUPT);
     }
 
     return 0;

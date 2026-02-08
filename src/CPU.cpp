@@ -215,20 +215,13 @@ int CPU::execute() {
         }
     }
 
-    dbg->end_section_timing("cpu");
-    dbg->start_section_timing();
     // Interrupt handling
     set_new_interrupts();
     if (handle_interrupts()) {
-        // if (intrpt_info.wait_cycles > 0) return;
-        // else {
-            // PC was updated to interrupt handler:
-            // Re-fetch cmd with new PC 
-            cmd = mem->get(rf.regs[PC].val);
-        // }
+        // PC was updated to interrupt handler:
+        // Re-fetch cmd with new PC
+        cmd = mem->get(rf.regs[PC].val);
     }
-    dbg->end_section_timing("interrupt");
-    dbg->start_section_timing();
     
 
     // increment PC

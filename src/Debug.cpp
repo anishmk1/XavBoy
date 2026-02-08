@@ -23,6 +23,10 @@ Debug::Debug() {
     perf.num_main_loops = 0;
     perf.frame_cpu_time_ms = 0.0;
     perf.frame_ppu_time_ms = 0.0;
+    perf.frame_ppu_oam_scan_time_ms = 0.0;
+    perf.frame_ppu_draw_pixels_time_ms = 0.0;
+    perf.frame_ppu_hblank_time_ms = 0.0;
+    perf.frame_ppu_vblank_time_ms = 0.0;
     perf.frame_mmio_time_ms = 0.0;
     perf.frame_lcd_time_ms = 0.0;
     perf.frame_sdl_events_time_ms = 0.0;
@@ -252,15 +256,47 @@ void Debug::debugger_break() {
 void Debug::init_csv_logging() {
     if (!perf.csv_logging_enabled) return;
 
-    write_csv_header();
+    // Open file once and keep it open for entire runtime
+    perf.csv_file.open("perf/performance.csv", std::ios::out);
+    if (perf.csv_file.is_open()) {
+        perf.csv_file << "frame_number,cpu_time_ms,ppu_time_ms,ppu_oam_scan_time_ms,ppu_draw_pixels_time_ms,ppu_hblank_time_ms,ppu_vblank_time_ms,mmio_time_ms,lcd_time_ms,sdl_events_time_ms,debugger_time_ms,interrupt_time_ms,other_time_ms,total_frame_time_ms\n";
+    }
 }
 
-void Debug::start_frame_timing() {
+void Debug::new_frame_timing() {
     if (!perf.csv_logging_enabled) return;
 
+    // Finalize previous frame (skip for first frame)
+    if (frame_cnt > 0) {
+        auto frame_end_time = std::chrono::high_resolution_clock::now();
+        auto total_duration = std::chrono::duration<double, std::milli>(frame_end_time - perf.frame_start_time);
+
+        FramePerfData frame_data;
+        frame_data.cpu_time_ms = perf.frame_cpu_time_ms;
+        frame_data.ppu_time_ms = perf.frame_ppu_time_ms;
+        frame_data.ppu_oam_scan_time_ms = perf.frame_ppu_oam_scan_time_ms;
+        frame_data.ppu_draw_pixels_time_ms = perf.frame_ppu_draw_pixels_time_ms;
+        frame_data.ppu_hblank_time_ms = perf.frame_ppu_hblank_time_ms;
+        frame_data.ppu_vblank_time_ms = perf.frame_ppu_vblank_time_ms;
+        frame_data.mmio_time_ms = perf.frame_mmio_time_ms;
+        frame_data.lcd_time_ms = perf.frame_lcd_time_ms;
+        frame_data.sdl_events_time_ms = perf.frame_sdl_events_time_ms;
+        frame_data.debugger_time_ms = perf.frame_debugger_time_ms;
+        frame_data.interrupt_time_ms = perf.frame_interrupt_time_ms;
+        frame_data.other_time_ms = perf.frame_other_time_ms;
+        frame_data.total_frame_time_ms = total_duration.count();
+
+        write_csv_row(frame_data);
+    }
+
+    // Start timing new frame
     perf.frame_start_time = std::chrono::high_resolution_clock::now();
     perf.frame_cpu_time_ms = 0.0;
     perf.frame_ppu_time_ms = 0.0;
+    perf.frame_ppu_oam_scan_time_ms = 0.0;
+    perf.frame_ppu_draw_pixels_time_ms = 0.0;
+    perf.frame_ppu_hblank_time_ms = 0.0;
+    perf.frame_ppu_vblank_time_ms = 0.0;
     perf.frame_mmio_time_ms = 0.0;
     perf.frame_lcd_time_ms = 0.0;
     perf.frame_sdl_events_time_ms = 0.0;
@@ -271,86 +307,50 @@ void Debug::start_frame_timing() {
     perf.last_section_time = perf.frame_start_time;
 }
 
-void Debug::log_component_timing(const std::string& component, double time_ms) {
-    if (!perf.csv_logging_enabled) return;
-
-    if (component == "cpu") {
-        perf.frame_cpu_time_ms += time_ms;
-    } else if (component == "ppu") {
-        perf.frame_ppu_time_ms += time_ms;
-    } else if (component == "mmio") {
-        perf.frame_mmio_time_ms += time_ms;
-    } else if (component == "lcd") {
-        perf.frame_lcd_time_ms += time_ms;
-    } else if (component == "sdl_events") {
-        perf.frame_sdl_events_time_ms += time_ms;
-    } else if (component == "debugger") {
-        perf.frame_debugger_time_ms += time_ms;
-    } else if (component == "interrupt") {
-        perf.frame_interrupt_time_ms += time_ms;
-    } else if (component == "other") {
-        perf.frame_other_time_ms += time_ms;
-    }
-}
-
-void Debug::finalize_frame_timing() {
-    if (!perf.csv_logging_enabled) return;
-
-    auto frame_end_time = std::chrono::high_resolution_clock::now();
-    auto total_duration = std::chrono::duration<double, std::milli>(frame_end_time - perf.frame_start_time);
-
-    FramePerfData frame_data;
-    frame_data.cpu_time_ms = perf.frame_cpu_time_ms;
-    frame_data.ppu_time_ms = perf.frame_ppu_time_ms;
-    frame_data.mmio_time_ms = perf.frame_mmio_time_ms;
-    frame_data.lcd_time_ms = perf.frame_lcd_time_ms;
-    frame_data.sdl_events_time_ms = perf.frame_sdl_events_time_ms;
-    frame_data.debugger_time_ms = perf.frame_debugger_time_ms;
-    frame_data.interrupt_time_ms = perf.frame_interrupt_time_ms;
-    frame_data.other_time_ms = perf.frame_other_time_ms;
-    frame_data.total_frame_time_ms = total_duration.count();
-
-    write_csv_row(frame_data);
-}
-
-void Debug::write_csv_header() {
-    std::ofstream perf_csv("logs/performance.csv", std::ios::out);
-    if (perf_csv.is_open()) {
-        perf_csv << "frame_number,cpu_time_ms,ppu_time_ms,mmio_time_ms,lcd_time_ms,sdl_events_time_ms,debugger_time_ms,interrupt_time_ms,other_time_ms,total_frame_time_ms\n";
-        perf_csv.close();
+void Debug::log_component_timing(PerfSection section, double time_ms) {
+    switch (section) {
+        case PerfSection::CPU:             perf.frame_cpu_time_ms += time_ms; break;
+        case PerfSection::PPU:             perf.frame_ppu_time_ms += time_ms; break;
+        case PerfSection::PPU_OAM_SCAN:    perf.frame_ppu_oam_scan_time_ms += time_ms; break;
+        case PerfSection::PPU_DRAW_PIXELS: perf.frame_ppu_draw_pixels_time_ms += time_ms; break;
+        case PerfSection::PPU_HBLANK:      perf.frame_ppu_hblank_time_ms += time_ms; break;
+        case PerfSection::PPU_VBLANK:      perf.frame_ppu_vblank_time_ms += time_ms; break;
+        case PerfSection::MMIO:            perf.frame_mmio_time_ms += time_ms; break;
+        case PerfSection::LCD:             perf.frame_lcd_time_ms += time_ms; break;
+        case PerfSection::SDL_EVENTS:      perf.frame_sdl_events_time_ms += time_ms; break;
+        case PerfSection::DEBUGGER:        perf.frame_debugger_time_ms += time_ms; break;
+        case PerfSection::INTERRUPT:       perf.frame_interrupt_time_ms += time_ms; break;
+        case PerfSection::OTHER:           perf.frame_other_time_ms += time_ms; break;
     }
 }
 
 void Debug::write_csv_row(const FramePerfData& data) {
-    std::ofstream perf_csv("logs/performance.csv", std::ios::app);
-    if (perf_csv.is_open()) {
-        perf_csv << frame_cnt << ","
-                << std::fixed << std::setprecision(4)
-                << data.cpu_time_ms << ","
-                << data.ppu_time_ms << ","
-                << data.mmio_time_ms << ","
-                << data.lcd_time_ms << ","
-                << data.sdl_events_time_ms << ","
-                << data.debugger_time_ms << ","
-                << data.interrupt_time_ms << ","
-                << data.other_time_ms << ","
-                << data.total_frame_time_ms << "\n";
-        perf_csv.close();
-    }
+    if (!perf.csv_file.is_open()) return;
+
+    perf.csv_file << frame_cnt << ","
+            << std::fixed << std::setprecision(4)
+            << data.cpu_time_ms << ","
+            << data.ppu_time_ms << ","
+            << data.ppu_oam_scan_time_ms << ","
+            << data.ppu_draw_pixels_time_ms << ","
+            << data.ppu_hblank_time_ms << ","
+            << data.ppu_vblank_time_ms << ","
+            << data.mmio_time_ms << ","
+            << data.lcd_time_ms << ","
+            << data.sdl_events_time_ms << ","
+            << data.debugger_time_ms << ","
+            << data.interrupt_time_ms << ","
+            << data.other_time_ms << ","
+            << data.total_frame_time_ms << "\n";
 }
 
-// Detailed section timing methods
-void Debug::start_section_timing() {
-    if (!perf.csv_logging_enabled) return;
-    perf.last_section_time = std::chrono::high_resolution_clock::now();
-}
-
-void Debug::end_section_timing(const std::string& section_name) {
+// Section timing - measures time since last section ended (or frame started)
+void Debug::end_section_timing(PerfSection section) {
     if (!perf.csv_logging_enabled) return;
 
     auto current_time = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration<double, std::milli>(current_time - perf.last_section_time);
 
-    log_component_timing(section_name, duration.count());
+    log_component_timing(section, duration.count());
     perf.last_section_time = current_time;
 }
