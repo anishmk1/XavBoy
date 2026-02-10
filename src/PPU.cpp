@@ -263,7 +263,7 @@ void PPU::render_pixel() {
 /**
  * Returns if the static object tile data is valid
  */
-bool PPU::fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Object &obj, std::ostringstream& debug_oss) {
+bool PPU::fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Object &obj) {
     // ------------------------------------------- //
     //              Get Object Tile                //
     // ------------------------------------------- //
@@ -273,13 +273,13 @@ bool PPU::fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Obj
     bool found_object = false;
     if ((lcdc >> LCDC_OBJ_ENABLE_BIT) & 0b1) {
 
-        debug_oss << "         objects.size = " << objects.size << std::endl;
+        DBG_OSS(obj_debug_oss, "         objects.size = " << objects.size << std::endl);
         for (int i = 0; i < OBJ_FIFO_DEPTH; i++) {
             obj = objects.fifo[i];
 
             if ((pixel_x >= (obj.x_pos - 8)) && (pixel_x < obj.x_pos)) {
                 found_object = true;
-                debug_oss << "         found objects.fifo[" << i << "]" << std::endl;
+                DBG_OSS(obj_debug_oss, "         found objects.fifo[" << i << "]" << std::endl);
                 break;
             }
         }
@@ -299,16 +299,16 @@ bool PPU::fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Obj
             for (int i = 0; i < 32; i++) {
                 tile_data[i] = mem->get(tile_data_addr + i);
             }
-            debug_oss << "         Obj tile_id = " << tile_id << " (8x16); tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
-            debug_oss << "         Tile_data = "; for (int i = 0; i < 32; i++) { debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "; } debug_oss << std::endl;
+            DBG_OSS(obj_debug_oss, "         Obj tile_id = " << tile_id << " (8x16); tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl);
+            DBG_OSS(obj_debug_oss, "         Tile_data = "); for (int i = 0; i < 32; i++) { DBG_OSS(obj_debug_oss, std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "); } DBG_OSS(obj_debug_oss, std::endl);
         } else {
             // 8x8 mode: fetch only 16 bytes
             uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
             for (int i = 0; i < 16; i++) {
                 tile_data[i] = mem->get(tile_data_addr + i);
             }
-            debug_oss << "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl;
-            debug_oss << "         Tile_data = "; for (int i = 0; i < 16; i++) { debug_oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "; } debug_oss << std::endl;
+            DBG_OSS(obj_debug_oss, "         Obj tile_id = " << tile_id << "; tile_data_addr = 0x" << std::hex << tile_data_addr << std::endl);
+            DBG_OSS(obj_debug_oss, "         Tile_data = "); for (int i = 0; i < 16; i++) { DBG_OSS(obj_debug_oss, std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(tile_data[i]) << " "); } DBG_OSS(obj_debug_oss, std::endl);
         }
 
         return true;
@@ -321,7 +321,7 @@ bool PPU::fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Obj
 
 }
 
-bool PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss) {
+bool PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data) {
     // bool fetching_new_tile = false;
     uint8_t lcdc = mem->get(REG_LCDC);
 
@@ -331,7 +331,7 @@ bool PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data,
     }
 
     if (((pixel_x + scx_sampled) % 8 == 0)) {
-        debug_oss << "         BG" << std::endl;
+        DBG_OSS(bg_debug_oss, "         BG" << std::endl);
 
         // Fetch background tile
 
@@ -370,20 +370,20 @@ bool PPU::fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data,
         }
 
         // tile_id <- tile_id_addr
-        debug_oss << "         tile_id=" << tile_id << "; tile_id_addr=0x" << std::hex << static_cast<int>(tile_id_addr) << std::endl;
+        DBG_OSS(bg_debug_oss, "         tile_id=" << tile_id << "; tile_id_addr=0x" << std::hex << static_cast<int>(tile_id_addr) << std::endl);
         uint16_t tile_data_addr = tile_data_base_addr + (tile_id * 16);
         for (int i = 0; i < 16; i++) {
             // Populating each byte of tile data
             tile_data[i] = mem->get(tile_data_addr + i);
         }
 
-        debug_oss << "         tile_data_addr=" << std::hex << static_cast<int>(tile_data_addr)
-                    << "; tile_data_base_addr=0x" << static_cast<int>(tile_data_base_addr) << std::endl;
-        debug_oss << "         Tile_data = ";
+        DBG_OSS(bg_debug_oss, "         tile_data_addr=" << std::hex << static_cast<int>(tile_data_addr)
+                    << "; tile_data_base_addr=0x" << static_cast<int>(tile_data_base_addr) << std::endl);
+        DBG_OSS(bg_debug_oss, "         Tile_data = ");
         for (int i = 0; i < 16; i++) {
-            debug_oss << std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ";
+            DBG_OSS(bg_debug_oss, std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ");
         }
-        debug_oss << std::endl;
+        DBG_OSS(bg_debug_oss, std::endl);
         // DBG ("         Tile_data = ");
         // for (int i = 0; i < 16; i++) {
         //     DBG (std::hex << std::setw(2) << static_cast<int>(tile_data[i]) << " ");
@@ -503,7 +503,11 @@ void PPU::fetch_pixel(int pixel_x) {
     static std::array<uint8_t, 32> obj_tile_data;  // 32 bytes for 8x16 sprites
     static std::array<uint8_t, 16> win_tile_data, bg_tile_data;
     bool obj_tile_data_valid, win_tile_data_valid, bg_tile_data_valid;
-    std::ostringstream bg_debug_oss, win_debug_oss, obj_debug_oss;
+#ifdef DEBUG_MODE
+    bg_debug_oss.str(""); bg_debug_oss.clear();
+    win_debug_oss.str(""); win_debug_oss.clear();
+    obj_debug_oss.str(""); obj_debug_oss.clear();
+#endif
 
     // uint8_t lcdc = mem->get(REG_LCDC);
     
@@ -515,16 +519,18 @@ void PPU::fetch_pixel(int pixel_x) {
     // --------------------------------------------- //
     //      Stage 1: Fetch / Refresh Tile Data       //
     // --------------------------------------------- //
-    obj_tile_data_valid = fetch_object_tile(pixel_x, obj_tile_data, obj, obj_debug_oss);
-    bg_tile_data_valid = fetch_background_tile(pixel_x, bg_tile_data, bg_debug_oss);
+    obj_tile_data_valid = fetch_object_tile(pixel_x, obj_tile_data, obj);
+    bg_tile_data_valid = fetch_background_tile(pixel_x, bg_tile_data);
     win_tile_data_valid = fetch_window_tile(pixel_x, win_tile_data);
 
     DBG( "      pxl_x = " << std::dec << pixel_x << "; ");
     DBG( "OBJ: " << obj_tile_data_valid << "; WIN: " << win_tile_data_valid << "; BG: " << bg_tile_data_valid << std::endl);
 
+#ifdef DEBUG_MODE
     if (obj_tile_data_valid) DBG(obj_debug_oss.str());
     if (win_tile_data_valid) DBG(win_debug_oss.str());
     if (bg_tile_data_valid) DBG(bg_debug_oss.str());
+#endif
 
     // ------------------------------------------------- //
     //      Stage 2: Final Display Pixel Selection       //

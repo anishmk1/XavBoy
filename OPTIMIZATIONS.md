@@ -1,5 +1,12 @@
 # XavBoy Performance Optimizations
 
+## Performance Log
+
+| # | FPS  | Date | Top 3 Contributors                                 | Optimization                                          |
+|---|------|------|----------------------------------------------------|-------------------------------------------------------|
+| 1 | 60.5 | 2/09 | PPU VBlank 35.1%, PPU Draw 26.9%, PPU HBlank 14.5% | Remove per-pixel ostringstream allocs (DBG_OSS macro) |
+| 0 | 41.8 | 2/07 | PPU Draw 71.2%, PPU HBlank 9.8%, CPU 6.2%          | Baseline                                              |
+
 ## Performance Baseline (2026-02-07)
 
 336 frames analyzed (excluding first frame). Average frame time: **23.93ms** (~41.8 FPS).

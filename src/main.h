@@ -106,9 +106,13 @@ extern CPU *cpu;
 
 
 #ifdef DEBUG_MODE
+    #include <sstream>
     #define DBG(x) do { if (DBG_ENABLED) { debug_file << x; } } while(0)
+    #define DBG_OSS(oss, x) do { oss << x; } while(0)
+    extern std::ostringstream bg_debug_oss, win_debug_oss, obj_debug_oss;
 #else
     #define DBG(x) do {} while(0)
+    #define DBG_OSS(oss, x) do {} while(0)
 #endif
 
 // #define PXL(x) do { pixel_map << x; } while (0)

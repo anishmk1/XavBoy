@@ -47,6 +47,9 @@ bool PRINT_REGS_EN = true;
 bool CPU_ONLY = false;
 bool SKIP_BOOT_ROM = false;         // default: false; Ninentdo logo boot rom runs by default on startup
 bool DBG_ENABLED = true;            // default: enabled when DEBUG_MODE is set
+#ifdef DEBUG_MODE
+std::ostringstream bg_debug_oss, win_debug_oss, obj_debug_oss;
+#endif
 const bool LOAD_BOOT_ROM = true;    // default: true; ROM includes bytes from addr 0 to 0x100 so Memory will load ROM starting at 0. Most ROMS will have this. Only my own test roms wont. They should be loaded into 0x100 because thats where PC should start from
 const bool GAMEBOY_DOCTOR = true;   // controls when print_regs is run and how it is formatted. Does not affect functionality
 

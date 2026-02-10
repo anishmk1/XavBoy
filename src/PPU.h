@@ -89,8 +89,8 @@ public:
     void draw_pixels();
     void oam_scan();
     void fetch_pixel(int pixel_x);
-    bool fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Object &obj, std::ostringstream& debug_oss);
-    bool fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data, std::ostringstream& debug_oss);
+    bool fetch_object_tile(int pixel_x, std::array<uint8_t, 32>& tile_data, Object &obj);
+    bool fetch_background_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
     bool fetch_window_tile(int pixel_x, std::array<uint8_t, 16>& tile_data);
     void render_pixel();
     void oam_dma_transfer(uint8_t source_page);

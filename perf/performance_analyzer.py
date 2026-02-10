@@ -231,9 +231,10 @@ def create_average_time_pie_chart(df, output_dir=".", suffix=""):
     plt.setp(texts, size=11)
 
     # Add title with summary info
+    avg_fps = 1000.0 / avg_total_frame if avg_total_frame > 0 else 0
     plt.title(f'Average Time Distribution per Frame\n'
              f'(Excluding first frame, {len(df_filtered)} frames analyzed)\n'
-             f'Average frame time: {avg_total_frame:.2f}ms',
+             f'Average frame time: {avg_total_frame:.2f}ms ({avg_fps:.1f} FPS)',
              fontsize=14, fontweight='bold', pad=20)
 
     # Add a legend with actual times
